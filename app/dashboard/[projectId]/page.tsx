@@ -1,0 +1,226 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { useUser } from "@clerk/nextjs";
+import { Plus, Trash2, Copy, Edit } from "lucide-react";
+import { toast } from "react-hot-toast";
+import axios from "axios";
+
+type Project = {
+  id: string;
+  name: string;
+  slug?: string;
+  createdAt: string;
+  apiBaseUrl: string;
+  description?: string;
+};
+
+type Resource = {
+  id: string;
+  projectId: string;
+  name: string;
+  description?: string;
+  slug: string;
+  mockData: unknown;
+  enabledMethods: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
+
+export default function ProjectDetailPage() {
+  const params = useParams();
+  const router = useRouter();
+  const projectId = params?.projectId as string;
+  const [project, setProject] = useState<Project | null>(null);
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useUser();
+  const userPrefix = (user?.primaryEmailAddress?.emailAddress || "guest").split("@")[0];
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        setIsLoading(true);
+        
+        // Get project first
+        const projectRes = await axios.get<Project>(`${API_BASE_URL}/api/projects/${projectId}`);
+        if (!cancelled) {
+          setProject(projectRes.data ?? null);
+        }
+        
+        // Get resources
+        const resourcesRes = await axios.get<Resource[]>(`${API_BASE_URL}/api/projects/${projectId}/resources`);
+        if (!cancelled) {
+          setResources(Array.isArray(resourcesRes.data) ? resourcesRes.data : []);
+        }
+      } catch (e) {
+        console.error("Failed to load project/resources from API:", e);
+        if (!cancelled) {
+          setProject(null);
+          setResources([]);
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+
+  if (isLoading) {
+    return (
+      <main className="mx-auto max-w-6xl px-4 py-10">
+        <p>Loading project…</p>
+      </main>
+    );
+  }
+
+  if (!project) {
+    return (
+      <main className="mx-auto max-w-6xl px-4 py-10">
+        <p className="text-muted-foreground">Project not found.</p>
+        <Button className="mt-4" asChild>
+          <Link href="/dashboard">Back to dashboard</Link>
+        </Button>
+      </main>
+    );
+  }
+
+  return (
+    <main className="mx-auto max-w-6xl px-4 py-10 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">{project.name}</h1>
+          <p className="text-muted-foreground">Manage endpoints for this project.</p>
+        </div>
+        <Button asChild>
+          <Link href={`/dashboard/${project.id}/endpoints/new`}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Resource
+          </Link>
+        </Button>
+      </div>
+
+      <Separator />
+
+      {resources.length === 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>No resources yet</CardTitle>
+            <CardDescription>Create your first resource to get started.</CardDescription>
+          </CardHeader>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {resources.map((resource) => {
+            const baseUrl = `http://localhost:8080/api/${project.slug || 'project-slug'}/${resource.slug}`;
+            const methodColors: {[key: string]: string} = {
+              'GET': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+              'POST': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+              'PUT': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
+              'DELETE': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+              'PATCH': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
+            };
+            
+            return (
+              <Card key={resource.id}>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold">{resource.name}</h3>
+                      <code className="text-sm font-mono text-muted-foreground">/{resource.slug}</code>
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => {
+                      navigator.clipboard.writeText(baseUrl);
+                      toast.success("Base URL copied to clipboard!");
+                    }}>
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </CardTitle>
+                  {resource.description && (
+                    <CardDescription>{resource.description}</CardDescription>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-2">
+                      {resource.enabledMethods.map((method, index) => {
+                        const displayMethod = method === 'GET_BY_ID' ? 'GET' : method;
+                        const route = method === 'GET_BY_ID' ? `/${resource.slug}/{id}` : 
+                                     method === 'GET' ? `/${resource.slug}` :
+                                     (method === 'PUT' || method === 'DELETE') ? `/${resource.slug}/{id}` : 
+                                     `/${resource.slug}`;
+                        const fullUrl = `http://localhost:8080/api/${project.slug || 'project-slug'}${route}`;
+                        
+                        return (
+                          <div key={`${method}-${index}`} className="flex items-center gap-1">
+                            <span className={`text-xs font-medium px-2 py-1 rounded ${methodColors[displayMethod] || 'bg-muted'}`}>
+                              {displayMethod}
+                            </span>
+                            <code className="text-xs text-muted-foreground">{route}</code>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="h-6 w-6 p-0"
+                              onClick={() => {
+                                navigator.clipboard.writeText(fullUrl);
+                                toast.success("Endpoint URL copied to clipboard!");
+                              }}
+                            >
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" asChild>
+                        <Link href={`/dashboard/${project.id}/endpoints/${resource.id}`}>
+                          <Edit className="h-3 w-3 mr-1" />
+                          Edit
+                        </Link>
+                      </Button>
+                      <Button size="sm" variant="destructive" onClick={async () => {
+                        if (!confirm("Are you sure you want to delete this resource? This action cannot be undone.")) {
+                          return;
+                        }
+
+                        try {
+                          await axios.delete(`${API_BASE_URL}/api/resources/${resource.id}`, {
+                            headers: {
+                              "User-Id": user?.id || "",
+                            },
+                          });
+                          
+                          toast.success("Resource deleted successfully!");
+                          setResources(prev => prev.filter(r => r.id !== resource.id));
+                        } catch (error) {
+                          console.error("Failed to delete resource:", error);
+                          toast.error("Failed to delete the resource. Please try again.");
+                        }
+                      }}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </main>
+  );
+}
+
+

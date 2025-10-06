@@ -1,16 +1,18 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import {  Lora } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "@/components/theme-provider";
+import { Navbar } from "@/components/navbar";
+import { Toaster } from "react-hot-toast";
+import { ClerkProvider } from "@clerk/nextjs";
+import { dark } from '@clerk/themes'
+import { UserProvider } from "@/components/user-provider";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+const loraFont = Lora({
+  variable: "--font-lora",
+  subsets: ["cyrillic", "latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -23,12 +25,24 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
-      </body>
-    </html>
+    <ClerkProvider 
+      appearance={{baseTheme: dark}} 
+      signInUrl="/sign-in" 
+      signUpUrl="/sign-up"
+      signInFallbackRedirectUrl="/dashboard"
+      signUpFallbackRedirectUrl="/dashboard"
+    >
+      <html lang="en" suppressHydrationWarning>
+        <body className={`${loraFont.className}  antialiased`}>
+          <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+            <UserProvider>
+              <Navbar />
+              {children}
+              <Toaster/>
+            </UserProvider>
+          </ThemeProvider>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
