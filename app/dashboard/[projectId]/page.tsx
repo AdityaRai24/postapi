@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -39,7 +39,6 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8
 
 export default function ProjectDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const projectId = params?.projectId as string;
   const [project, setProject] = useState<Project | null>(null);
   const [resources, setResources] = useState<Resource[]>([]);
@@ -323,7 +322,7 @@ export default function ProjectDetailPage() {
                     toast.success('Project deployed successfully!');
                     setProject((prev) => prev ? { ...prev, status: 'DEPLOYED' } : prev);
                     setShowDeployDialog(false);
-                  } catch (error) {
+                  } catch {
                     toast.error('Failed to deploy project.');
                   } finally {
                     setIsDeploying(false);

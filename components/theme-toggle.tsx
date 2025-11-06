@@ -7,8 +7,6 @@ import { Moon, Sun } from "lucide-react";
 
 export function ThemeToggle() {
   const { setTheme, resolvedTheme } = useTheme();
-  const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => setMounted(true), []);
 
   function toggleTheme() {
     const next = (resolvedTheme ?? "dark") === "dark" ? "light" : "dark";

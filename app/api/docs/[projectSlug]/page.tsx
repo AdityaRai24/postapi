@@ -68,7 +68,7 @@ export default function ApiDocsBySlugPage() {
     load();
   }, [projectSlug]);
 
-  const baseApiUrl = useMemo(() => `${API_BASE_URL}/api/${project?.slug || projectSlug}`, [project?.slug, projectSlug, API_BASE_URL]);
+  const baseApiUrl = useMemo(() => `${API_BASE_URL}/api/${project?.slug || projectSlug}`, [project?.slug, projectSlug]);
 
   const methodColor: Record<string, string> = {
     GET: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
@@ -232,7 +232,7 @@ export default function ApiDocsBySlugPage() {
                     </TabsContent>
                     <TabsContent value="curl">
                       <pre className="overflow-auto rounded-md border p-4 text-sm">
-curl -X GET "{baseApiUrl}/{r.slug}" -H "accept: application/json"
+curl -X GET &quot;{baseApiUrl}/{r.slug}&quot; -H &quot;accept: application/json&quot;
                       </pre>
                     </TabsContent>
                   </Tabs>

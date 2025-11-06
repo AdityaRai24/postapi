@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,7 +22,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import toast from "react-hot-toast";
-import { Plus, Settings, FolderOpen, Rocket } from "lucide-react";
+import { Plus, FolderOpen, Rocket } from "lucide-react";
 import axios from "axios";
 import { useUser } from "@clerk/nextjs";
 
@@ -35,7 +34,7 @@ type Project = {
   deployedLink?: string;
   userId: string;
   status: "DRAFT" | "DEPLOYED" | "ARCHIVED";
-  endpoints: any[]; // Define a proper Endpoint type if needed
+  endpoints: unknown[]; // Define a proper Endpoint type if needed
   createdAt: string;
   updatedAt: string;
 };
@@ -43,7 +42,6 @@ type Project = {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
 
 export default function DashboardPage() {
-  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -56,11 +54,7 @@ export default function DashboardPage() {
 
   const { user } = useUser();
 
-  useEffect(() => {
-    fetchProjects();
-  }, [user?.id]);
-
-  async function fetchProjects() {
+  const fetchProjects = useCallback(async () => {
     if (!user?.id) {
       setLoading(false);
       return;
@@ -80,7 +74,11 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
 
   async function createProject() {
     if (!name.trim() || !slug.trim() || !user?.id) return;
@@ -148,10 +146,6 @@ export default function DashboardPage() {
     }
   }
 
-  const openDeployModal = (project: Project) => {
-    setSelectedProject(project);
-    setDeployModalOpen(true);
-  };
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 space-y-8">
@@ -228,7 +222,7 @@ export default function DashboardPage() {
             <CardHeader>
               <CardTitle>No projects yet</CardTitle>
               <CardDescription>
-                Click "Create Project" to start a new project.
+                Click &quot;Create Project&quot; to start a new project.
               </CardDescription>
             </CardHeader>
           </Card>

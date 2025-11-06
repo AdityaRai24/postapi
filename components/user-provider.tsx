@@ -3,11 +3,13 @@
 import { createContext, useContext, useMemo, ReactNode } from "react";
 import { useUser } from "@clerk/nextjs";
 
+type UserType = ReturnType<typeof useUser>["user"];
+
 type UserContextValue = {
   isSignedIn: boolean;
   userId: string | null;
   email: string | null;
-  user: any | null;
+  user: UserType;
 };
 
 const UserContext = createContext<UserContextValue>({

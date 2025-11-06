@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +26,7 @@ type Endpoint = {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
 
-export default function ConfigureEndpointPage() {
+function ConfigureEndpointContent() {
   const params = useSearchParams();
   const router = useRouter();
   const projectId = params.get("projectId");
@@ -94,7 +95,7 @@ export default function ConfigureEndpointPage() {
       });
       setSaved(true);
       router.push(`/dashboard/${projectId}`);
-    } catch (e) {
+    } catch {
       setError("Failed to save the endpoint. Please try again.");
     }
   }
@@ -156,6 +157,21 @@ export default function ConfigureEndpointPage() {
         </CardContent>
       </Card>
     </main>
+  );
+}
+
+export default function ConfigureEndpointPage() {
+  return (
+    <Suspense fallback={
+      <main className="mx-auto max-w-3xl px-4 py-10 space-y-6">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Configure endpoint</h1>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </main>
+    }>
+      <ConfigureEndpointContent />
+    </Suspense>
   );
 }
 

@@ -18,10 +18,10 @@ import {
 } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Save, ArrowLeft, Wand2, Settings } from "lucide-react";
-import { JsonView, allExpanded, darkStyles, defaultStyles } from 'react-json-view-lite';
+import { JsonView, allExpanded, darkStyles } from 'react-json-view-lite';
 import 'react-json-view-lite/dist/index.css';
 
 // --- TYPES TO MATCH YOUR SPRING BOOT MODELS ---
@@ -182,7 +182,7 @@ export default function NewEndpointPage() {
     try {
       parsedJson = JSON.parse(jsonSchema);
       setJsonError(null);
-    } catch (e) {
+    } catch {
       setJsonError("Invalid JSON. Please fix and try again.");
       return;
     }
@@ -427,7 +427,7 @@ export default function NewEndpointPage() {
           <DialogHeader>
             <DialogTitle>Select Primary Key</DialogTitle>
             <DialogDescription>
-              Choose the unique identifier field for this resource from the first object's keys.
+              Choose the unique identifier field for this resource from the first object&apos;s keys.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
