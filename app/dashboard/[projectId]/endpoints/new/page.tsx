@@ -19,7 +19,10 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Save, ArrowLeft, Wand2, Settings } from "lucide-react";
+import { JsonView, allExpanded, darkStyles, defaultStyles } from 'react-json-view-lite';
+import 'react-json-view-lite/dist/index.css';
 
 // --- TYPES TO MATCH YOUR SPRING BOOT MODELS ---
 type EndPoint = {
@@ -76,10 +79,13 @@ export default function NewEndpointPage() {
     DELETE: "",
   });
   const [jsonSchema, setJsonSchema] = useState(
-    '{\n  "id": 1,\n  "name": "Sample Product",\n  "price": 99.99,\n  "description": "A sample product"\n}'
+    '[\n  {\n    "id": 1,\n    "name": "Sample Product",\n    "price": 99.99,\n    "description": "A sample product"\n  },\n  {\n    "id": 2,\n    "name": "Another Product",\n    "price": 49.0,\n    "description": "Another sample"\n  }\n]'
   );
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [primaryKey, setPrimaryKey] = useState<string | null>(null);
+  const [primaryKeyOptions, setPrimaryKeyOptions] = useState<string[]>([]);
+  const [isPrimaryKeyModalOpen, setIsPrimaryKeyModalOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMethodForModal, setSelectedMethodForModal] = useState<string | null>(null);
   // --- DATA FETCHING: Replaced localStorage with an API call ---
@@ -146,13 +152,14 @@ export default function NewEndpointPage() {
   ];
 
   const generateMockData = () => {
-    const sampleData = {
+    const sampleItem = {
       id: 1,
       name: `Sample ${endpointName || 'Item'}`,
       description: `A sample ${endpointName?.toLowerCase() || 'item'}`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+    const sampleData = [sampleItem, { ...sampleItem, id: 2, name: `${sampleItem.name} 2` }];
     setJsonSchema(JSON.stringify(sampleData, null, 2));
   };
 
@@ -171,12 +178,26 @@ export default function NewEndpointPage() {
       return;
     }
 
-    let parsedJson;
+    let parsedJson: unknown;
     try {
       parsedJson = JSON.parse(jsonSchema);
       setJsonError(null);
     } catch (e) {
       setJsonError("Invalid JSON. Please fix and try again.");
+      return;
+    }
+
+    // Require an array of objects
+    if (!Array.isArray(parsedJson) || parsedJson.length === 0 || typeof parsedJson[0] !== 'object' || parsedJson[0] === null) {
+      setJsonError("Please provide an array of objects as your data.");
+      return;
+    }
+
+    // If primary key not chosen, open modal with keys from first object
+    const firstKeys = Object.keys(parsedJson[0] as Record<string, unknown>);
+    if (!primaryKey) {
+      setPrimaryKeyOptions(firstKeys);
+      setIsPrimaryKeyModalOpen(true);
       return;
     }
 
@@ -189,6 +210,7 @@ export default function NewEndpointPage() {
         description: endpointDescription.trim(),
         slug: baseSlug.trim(),
         mockData: parsedJson,
+        primaryKey,
         enabledMethods: selectedMethodKeys.map(methodKey => {
           const config = methodConfigs.find(c => c.key === methodKey);
           return config?.method || methodKey;
@@ -213,6 +235,11 @@ export default function NewEndpointPage() {
       toast.error("Failed to save the resource. Please try again.");
       setIsSaving(false);
     }
+  }
+
+  async function confirmPrimaryKeyAndSave() {
+    if (!primaryKey) return;
+    await saveResource();
   }
 
   if (isLoading) {
@@ -269,8 +296,10 @@ export default function NewEndpointPage() {
                 id="endpointDescription"
                 placeholder="Describe what this endpoint group manages..."
                 value={endpointDescription}
+                className="!max-h-[400px]"
                 onChange={(e) => setEndpointDescription(e.target.value)}
                 rows={3}
+
               />
             </div>
           </CardContent>
@@ -334,15 +363,28 @@ export default function NewEndpointPage() {
               </Button>
               
               <div className="space-y-2">
-                <Label htmlFor="json-data">JSON Data (Ctrl+V to paste)</Label>
+                <Label htmlFor="json-data">JSON Data (array of objects)</Label>
                 <Textarea
                   id="json-data"
-                  rows={20}
+                  rows={12}
                   value={jsonSchema}
                   onChange={(e) => setJsonSchema(e.target.value)}
                   placeholder="Paste your JSON data here or use the Generate AI Data button..."
-                  className="font-mono text-sm"
+                  className="font-mono max-h-[300px] text-sm"
                 />
+                {/* Try parsing, show preview if valid */}
+                {(() => {
+                  try {
+                    const parsed = JSON.parse(jsonSchema);
+                    return (
+                      <div className="border border-border rounded mt-3 bg-background">
+                        <JsonView data={parsed} clickToExpandNode={true} shouldExpandNode={allExpanded} style={darkStyles} />
+                      </div>
+                    );
+                  } catch {
+                    return null;
+                  }
+                })()}
                 {jsonError && (
                   <p className="text-sm text-destructive mt-2">{jsonError}</p>
                 )}
@@ -379,6 +421,34 @@ export default function NewEndpointPage() {
         </Button>
       </div>
 
+      {/* Primary Key Modal */}
+      <Dialog open={isPrimaryKeyModalOpen} onOpenChange={setIsPrimaryKeyModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Select Primary Key</DialogTitle>
+            <DialogDescription>
+              Choose the unique identifier field for this resource from the first object's keys.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Primary Key</Label>
+            <Select value={primaryKey ?? undefined} onValueChange={setPrimaryKey}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a key" />
+              </SelectTrigger>
+              <SelectContent>
+                {primaryKeyOptions.map((k) => (
+                  <SelectItem key={k} value={k}>{k}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setIsPrimaryKeyModalOpen(false)}>Cancel</Button>
+            <Button onClick={confirmPrimaryKeyAndSave} disabled={!primaryKey}>Confirm & Save</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       {/* Method Settings Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-[425px]">

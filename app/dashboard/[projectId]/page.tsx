@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useUser } from "@clerk/nextjs";
-import { Plus, Trash2, Copy, Edit } from "lucide-react";
+import { Plus, Trash2, Copy, Edit, Rocket, BookText, Check } from "lucide-react";
 import { toast } from "react-hot-toast";
 import axios from "axios";
 
@@ -18,6 +19,8 @@ type Project = {
   createdAt: string;
   apiBaseUrl: string;
   description?: string;
+  status?: "DRAFT" | "DEPLOYED" | "ARCHIVED";
+  deployedLink?: string;
 };
 
 type Resource = {
@@ -42,7 +45,12 @@ export default function ProjectDetailPage() {
   const [resources, setResources] = useState<Resource[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useUser();
-  const userPrefix = (user?.primaryEmailAddress?.emailAddress || "guest").split("@")[0];
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [resourceToDelete, setResourceToDelete] = useState<Resource | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [showDeployDialog, setShowDeployDialog] = useState(false);
+  const [isDeploying, setIsDeploying] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,6 +85,7 @@ export default function ProjectDetailPage() {
     };
   }, [projectId]);
 
+
   if (isLoading) {
     return (
       <main className="mx-auto max-w-6xl px-4 py-10">
@@ -103,13 +112,41 @@ export default function ProjectDetailPage() {
           <h1 className="text-3xl font-semibold tracking-tight">{project.name}</h1>
           <p className="text-muted-foreground">Manage endpoints for this project.</p>
         </div>
-        <Button asChild>
-          <Link href={`/dashboard/${project.id}/endpoints/new`}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Resource
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          {project.slug && (
+            <>
+              <Button asChild variant="outline" disabled={resources.length === 0}>
+                <Link href={`/api/docs/${project.slug}`}>
+                  <BookText className="h-4 w-4 mr-2" />
+                  Documentation
+                </Link>
+              </Button>
+            </>
+          )}
+          <Button asChild>
+            <Link href={`/dashboard/${project.id}/endpoints/new`}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Resource
+            </Link>
+          </Button>
+          {project.status !== 'DEPLOYED' && resources.length > 0 && (
+            <Button
+              variant="default"
+              onClick={() => setShowDeployDialog(true)}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              <Rocket className="h-4 w-4 mr-2" />
+              Deploy
+            </Button>
+          )}
+        </div>
       </div>
+
+      {resources.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          Deploy and Documentation will be enabled after you create at least one resource.
+        </p>
+      )}
 
       <Separator />
 
@@ -142,9 +179,12 @@ export default function ProjectDetailPage() {
                     </div>
                     <Button size="sm" variant="ghost" onClick={() => {
                       navigator.clipboard.writeText(baseUrl);
-                      toast.success("Base URL copied to clipboard!");
+                      toast.success("Copied to clipboard");
+                      const key = `base-${resource.id}`;
+                      setCopiedKey(key);
+                      setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 2000);
                     }}>
-                      <Copy className="h-4 w-4" />
+                      {copiedKey === `base-${resource.id}` ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
                     </Button>
                   </CardTitle>
                   {resource.description && (
@@ -174,10 +214,13 @@ export default function ProjectDetailPage() {
                               className="h-6 w-6 p-0"
                               onClick={() => {
                                 navigator.clipboard.writeText(fullUrl);
-                                toast.success("Endpoint URL copied to clipboard!");
+                                toast.success("Copied to clipboard");
+                                const key = `ep-${resource.id}-${index}`;
+                                setCopiedKey(key);
+                                setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 2000);
                               }}
                             >
-                              <Copy className="h-3 w-3" />
+                              {copiedKey === `ep-${resource.id}-${index}` ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
                             </Button>
                           </div>
                         );
@@ -190,25 +233,7 @@ export default function ProjectDetailPage() {
                           Edit
                         </Link>
                       </Button>
-                      <Button size="sm" variant="destructive" onClick={async () => {
-                        if (!confirm("Are you sure you want to delete this resource? This action cannot be undone.")) {
-                          return;
-                        }
-
-                        try {
-                          await axios.delete(`${API_BASE_URL}/api/resources/${resource.id}`, {
-                            headers: {
-                              "User-Id": user?.id || "",
-                            },
-                          });
-                          
-                          toast.success("Resource deleted successfully!");
-                          setResources(prev => prev.filter(r => r.id !== resource.id));
-                        } catch (error) {
-                          console.error("Failed to delete resource:", error);
-                          toast.error("Failed to delete the resource. Please try again.");
-                        }
-                      }}>
+                      <Button size="sm" variant="destructive" onClick={() => { setResourceToDelete(resource); setDeleteDialogOpen(true); }}>
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
@@ -218,6 +243,103 @@ export default function ProjectDetailPage() {
             );
           })}
         </div>
+      )}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Delete Resource</DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. This will permanently delete the resource
+              {resourceToDelete ? ` "${resourceToDelete.name}"` : ""} and its configuration.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            {resourceToDelete && (
+              <div className="rounded-md border p-3">
+                <div className="font-mono text-xs text-muted-foreground">/{resourceToDelete.slug}</div>
+                {resourceToDelete.description && (
+                  <div className="mt-1 text-muted-foreground">{resourceToDelete.description}</div>
+                )}
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={isDeleting}>Cancel</Button>
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  if (!resourceToDelete) return;
+                  try {
+                    setIsDeleting(true);
+                    await axios.delete(`${API_BASE_URL}/api/resources/${resourceToDelete.id}`, {
+                      headers: { "User-Id": user?.id || "" },
+                    });
+                    toast.success("Resource deleted successfully!");
+                    setResources(prev => prev.filter(r => r.id !== resourceToDelete.id));
+                    setDeleteDialogOpen(false);
+                    setResourceToDelete(null);
+                  } catch (error) {
+                    console.error("Failed to delete resource:", error);
+                    toast.error("Failed to delete the resource. Please try again.");
+                  } finally {
+                    setIsDeleting(false);
+                  }
+                }}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Deploy Dialog */}
+      {showDeployDialog && (
+        <Dialog open={showDeployDialog} onOpenChange={setShowDeployDialog}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Deploy Project</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to deploy this project? It will become live and API endpoints will be accessible via the deployed URL.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-3">
+              <div>
+                <span className="font-medium">Name:</span> {project.name}
+              </div>
+              <div>
+                <span className="font-medium">Deploy URL:</span> <code>http://localhost:8080/api/{project.slug}</code>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end pt-2">
+              <Button variant="outline" onClick={() => setShowDeployDialog(false)} disabled={isDeploying}>Cancel</Button>
+              <Button
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={async () => {
+                  setIsDeploying(true);
+                  try {
+                    await axios.put(`${API_BASE_URL}/api/projects/${project.id}/deploy`, {}, {
+                      headers: { 'User-Id': user?.id || '' }
+                    });
+                    toast.success('Project deployed successfully!');
+                    setProject((prev) => prev ? { ...prev, status: 'DEPLOYED' } : prev);
+                    setShowDeployDialog(false);
+                  } catch (error) {
+                    toast.error('Failed to deploy project.');
+                  } finally {
+                    setIsDeploying(false);
+                  }
+                }}
+                disabled={isDeploying}
+              >
+                {isDeploying ? (
+                  <><Rocket className="h-4 w-4 mr-2 animate-spin" /> Deploying...</>
+                ) : (
+                  <><Rocket className="h-4 w-4 mr-2" /> Deploy Project</>
+                )}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </main>
   );

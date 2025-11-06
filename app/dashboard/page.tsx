@@ -249,25 +249,6 @@ export default function DashboardPage() {
                       Open Project
                     </Link>
                   </Button>
-                  {p.status === 'DEPLOYED' ? (
-                    <Button 
-                      variant="default"
-                      size="sm"
-                      onClick={() => openDeployModal(p)}
-                    >
-                      <Rocket className="h-4 w-4 mr-2" />
-                      View Deployment
-                    </Button>
-                  ) : (
-                    <Button 
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openDeployModal(p)}
-                    >
-                      <Rocket className="h-4 w-4 mr-2" />
-                      Deploy
-                    </Button>
-                  )}
                 </div>
               </CardContent>
             </Card>
@@ -345,11 +326,14 @@ export default function DashboardPage() {
           )}
           <DialogFooter>
             {selectedProject?.status === 'DEPLOYED' ? (
-              <Button
-                onClick={() => setDeployModalOpen(false)}
-              >
-                Close
-              </Button>
+              <>
+                {selectedProject?.slug && (
+                  <Button asChild variant="secondary">
+                    <Link href={`/docs/${selectedProject.slug}`}>View Docs</Link>
+                  </Button>
+                )}
+                <Button onClick={() => setDeployModalOpen(false)}>Close</Button>
+              </>
             ) : (
               <>
                 <Button
