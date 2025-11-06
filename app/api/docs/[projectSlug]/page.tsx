@@ -68,7 +68,7 @@ export default function ApiDocsBySlugPage() {
     load();
   }, [projectSlug]);
 
-  const baseApiUrl = useMemo(() => `http://localhost:8080/api/${project?.slug || projectSlug}`, [project?.slug, projectSlug]);
+  const baseApiUrl = useMemo(() => `${API_BASE_URL}/api/${project?.slug || projectSlug}`, [project?.slug, projectSlug, API_BASE_URL]);
 
   const methodColor: Record<string, string> = {
     GET: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",

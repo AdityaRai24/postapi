@@ -122,7 +122,7 @@ export default function EditEndpointPage() {
     );
   }
 
-  const basePreview = `http://localhost:8080/${userPrefix}/`;
+  const basePreview = `${API_BASE_URL}/${userPrefix}/`;
   const fullUrl = basePreview + (slug || "<your-endpoint>");
 
   function saveEndpoint() {

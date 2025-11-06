@@ -40,7 +40,7 @@ export default function ConfigureEndpointPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [saved, setSaved] = React.useState(false);
 
-  const basePreview = `http://localhost:8080/${userPrefix}/`;
+  const basePreview = `${API_BASE_URL}/${userPrefix}/`;
   const fullUrl = basePreview + (slug || "<your-endpoint>");
 
   React.useEffect(() => {

@@ -160,7 +160,7 @@ export default function ProjectDetailPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {resources.map((resource) => {
-            const baseUrl = `http://localhost:8080/api/${project.slug || 'project-slug'}/${resource.slug}`;
+            const baseUrl = `${API_BASE_URL}/api/${project.slug || 'project-slug'}/${resource.slug}`;
             const methodColors: {[key: string]: string} = {
               'GET': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
               'POST': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
@@ -200,7 +200,7 @@ export default function ProjectDetailPage() {
                                      method === 'GET' ? `/${resource.slug}` :
                                      (method === 'PUT' || method === 'DELETE') ? `/${resource.slug}/{id}` : 
                                      `/${resource.slug}`;
-                        const fullUrl = `http://localhost:8080/api/${project.slug || 'project-slug'}${route}`;
+                        const fullUrl = `${API_BASE_URL}/api/${project.slug || 'project-slug'}${route}`;
                         
                         return (
                           <div key={`${method}-${index}`} className="flex items-center gap-1">
@@ -307,7 +307,7 @@ export default function ProjectDetailPage() {
                 <span className="font-medium">Name:</span> {project.name}
               </div>
               <div>
-                <span className="font-medium">Deploy URL:</span> <code>http://localhost:8080/api/{project.slug}</code>
+                <span className="font-medium">Deploy URL:</span> <code>{API_BASE_URL}/api/{project.slug}</code>
               </div>
             </div>
             <div className="flex gap-2 justify-end pt-2">

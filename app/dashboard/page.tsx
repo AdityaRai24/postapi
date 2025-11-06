@@ -40,7 +40,7 @@ type Project = {
   updatedAt: string;
 };
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -311,7 +311,7 @@ export default function DashboardPage() {
                 </Label>
                 <Input
                   id="deployed-url"
-                  value={selectedProject.deployedLink || `http://localhost:8080/api/${selectedProject.slug || 'project-slug'}`}
+                  value={selectedProject.deployedLink || `${API_BASE_URL}/api/${selectedProject.slug || 'project-slug'}`}
                   readOnly
                   className="bg-muted"
                 />
