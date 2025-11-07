@@ -11,8 +11,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useUser } from "@clerk/nextjs";
 import { toast } from "react-hot-toast";
-import { Save, ArrowLeft, Trash2 } from "lucide-react";
+import { Save, ArrowLeft, Trash2, Settings, Check, Copy } from "lucide-react";
 import axios from "axios";
+import ReactCodeMirror, { oneDark } from "@uiw/react-codemirror";
+import { json } from "@codemirror/lang-json";
+import CodeMirror from "@uiw/react-codemirror";
 
 type Project = {
   id: string;
@@ -297,7 +300,7 @@ export default function EditEndpointPage() {
               </TabsList>
               <TabsContent value="edit" className="mt-4">
                 <div className="border rounded-md overflow-hidden">
-                  <CodeMirror
+                  <ReactCodeMirror
                     value={jsonText}
                     height="500px"
                     extensions={[json()]}
@@ -352,7 +355,6 @@ export default function EditEndpointPage() {
                     basicSetup={{
                       lineNumbers: true,
                       foldGutter: true,
-                      readOnly: true,
                     }}
                     className="text-sm"
                   />

@@ -25,7 +25,6 @@ import {
   Users,
   Zap,
 } from "lucide-react";
-import { Navbar } from "@/components/navbar";
 
 //=================================================================
 // Navigation Bar Component
@@ -287,7 +286,7 @@ export default function Home() {
         >
           <div className="flex flex-col items-center gap-4 text-center">
             <h2 className="text-3xl font-bold tracking-tight md:text-4xl">
-              Everything you need, nothing you don't
+              Everything you need, nothing you don&apos;t
             </h2>
             <p className="max-w-2xl text-lg text-muted-foreground">
               Powerful features to get your backend running instantly,

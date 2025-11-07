@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Save, ArrowLeft, Wand2, Settings, Copy, Check } from "lucide-react";
-import { JsonView, allExpanded, darkStyles } from 'react-json-view-lite';
+import { JsonView, darkStyles } from 'react-json-view-lite';
 import 'react-json-view-lite/dist/index.css';
 import CodeMirror from '@uiw/react-codemirror';
 import { json } from '@codemirror/lang-json';
