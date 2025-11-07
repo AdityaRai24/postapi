@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useUser } from "@clerk/nextjs";
 import { Plus, Trash2, Copy, Edit, Rocket, BookText, Check } from "lucide-react";
 import { toast } from "react-hot-toast";
@@ -87,8 +88,25 @@ export default function ProjectDetailPage() {
 
   if (isLoading) {
     return (
-      <main className="mx-auto max-w-6xl px-4 py-10">
-        <p>Loading project…</p>
+      <main className="mx-auto max-w-6xl px-4 py-10 space-y-6">
+        <div className="space-y-2">
+          <Skeleton className="h-9 w-64" />
+          <Skeleton className="h-5 w-96" />
+        </div>
+        <Separator />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-6 w-32" />
+                <Skeleton className="h-4 w-24 mt-2" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-20 w-full" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </main>
     );
   }
@@ -96,10 +114,19 @@ export default function ProjectDetailPage() {
   if (!project) {
     return (
       <main className="mx-auto max-w-6xl px-4 py-10">
-        <p className="text-muted-foreground">Project not found.</p>
-        <Button className="mt-4" asChild>
-          <Link href="/dashboard">Back to dashboard</Link>
-        </Button>
+        <Card className="max-w-md mx-auto">
+          <CardHeader>
+            <CardTitle>Project not found</CardTitle>
+            <CardDescription>
+              The project you're looking for doesn't exist or you don't have access to it.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild>
+              <Link href="/dashboard">Back to dashboard</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </main>
     );
   }
@@ -150,10 +177,21 @@ export default function ProjectDetailPage() {
       <Separator />
 
       {resources.length === 0 ? (
-        <Card>
-          <CardHeader>
+        <Card className="border-dashed">
+          <CardHeader className="text-center py-12">
+            <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+              <Plus className="h-6 w-6 text-muted-foreground" />
+            </div>
             <CardTitle>No resources yet</CardTitle>
-            <CardDescription>Create your first resource to get started.</CardDescription>
+            <CardDescription className="mt-2">
+              Create your first resource to start building your API endpoints.
+            </CardDescription>
+            <Button asChild className="mt-6">
+              <Link href={`/dashboard/${project.id}/endpoints/new`}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create your first resource
+              </Link>
+            </Button>
           </CardHeader>
         </Card>
       ) : (

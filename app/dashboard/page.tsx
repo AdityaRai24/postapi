@@ -22,9 +22,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import toast from "react-hot-toast";
-import { Plus, FolderOpen, Rocket } from "lucide-react";
+import { Plus, FolderOpen, Rocket, Calendar, Globe } from "lucide-react";
 import axios from "axios";
 import { useUser } from "@clerk/nextjs";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Project = {
   id: string;
@@ -51,6 +53,7 @@ export default function DashboardPage() {
   const [deployModalOpen, setDeployModalOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isDeploying, setIsDeploying] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   const { user } = useUser();
 
@@ -83,6 +86,7 @@ export default function DashboardPage() {
   async function createProject() {
     if (!name.trim() || !slug.trim() || !user?.id) return;
 
+    setIsCreating(true);
     try {
       const projectData = {
         name: name.trim(),
@@ -114,6 +118,8 @@ export default function DashboardPage() {
     } catch (error) {
       console.error("Failed to create project:", error);
       toast.error("Failed to create project. Please try again.");
+    } finally {
+      setIsCreating(false);
     }
   }
 
@@ -181,8 +187,18 @@ export default function DashboardPage() {
                   id="project-slug"
                   placeholder="e.g. ecommerce-api"
                   value={slug}
-                  onChange={(e) => setSlug(e.target.value)}
+                  onChange={(e) => {
+                    // Auto-format: lowercase, replace spaces with hyphens, remove special chars
+                    const formatted = e.target.value
+                      .toLowerCase()
+                      .replace(/\s+/g, "-")
+                      .replace(/[^a-z0-9-]/g, "");
+                    setSlug(formatted);
+                  }}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Only lowercase letters, numbers, and hyphens allowed
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="project-description">Description</Label>
@@ -198,9 +214,16 @@ export default function DashboardPage() {
             <DialogFooter>
               <Button
                 onClick={createProject}
-                disabled={!name.trim() || !slug.trim()}
+                disabled={!name.trim() || !slug.trim() || isCreating}
               >
-                Create Project
+                {isCreating ? (
+                  <>
+                    <Rocket className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  "Create Project"
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -209,35 +232,71 @@ export default function DashboardPage() {
 
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {loading ? (
-          <Card className="col-span-full">
-            <CardHeader>
-              <CardTitle>Loading projects...</CardTitle>
-              <CardDescription>
-                Please wait while we fetch your projects.
-              </CardDescription>
-            </CardHeader>
-          </Card>
+          <>
+            {[1, 2, 3].map((i) => (
+              <Card key={i}>
+                <CardHeader>
+                  <Skeleton className="h-6 w-32" />
+                  <Skeleton className="h-4 w-48 mt-2" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-10 w-full" />
+                </CardContent>
+              </Card>
+            ))}
+          </>
         ) : projects.length === 0 ? (
-          <Card className="col-span-full">
-            <CardHeader>
+          <Card className="col-span-full border-dashed">
+            <CardHeader className="text-center py-12">
+              <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+                <FolderOpen className="h-6 w-6 text-muted-foreground" />
+              </div>
               <CardTitle>No projects yet</CardTitle>
-              <CardDescription>
-                Click &quot;Create Project&quot; to start a new project.
+              <CardDescription className="mt-2">
+                Get started by creating your first API project. It only takes a few minutes!
               </CardDescription>
+              <Button className="mt-6" onClick={() => setOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create your first project
+              </Button>
             </CardHeader>
           </Card>
         ) : (
           projects.map((p) => (
-            <Card key={p.id}>
+            <Card key={p.id} className="hover:shadow-md transition-shadow">
               <CardHeader>
-                <CardTitle>{p.name}</CardTitle>
-                <CardDescription>
-                  {p.description || "No description"}
-                </CardDescription>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <CardTitle className="text-lg">{p.name}</CardTitle>
+                    <CardDescription className="mt-1 line-clamp-2">
+                      {p.description || "No description"}
+                    </CardDescription>
+                  </div>
+                  {p.status && (
+                    <Badge 
+                      variant={p.status === 'DEPLOYED' ? 'default' : 'secondary'}
+                      className="ml-2 shrink-0"
+                    >
+                      {p.status}
+                    </Badge>
+                  )}
+                </div>
+                {p.slug && (
+                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                    <Globe className="h-3 w-3" />
+                    <code className="font-mono">{p.slug}</code>
+                  </div>
+                )}
+                {p.createdAt && (
+                  <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                    <Calendar className="h-3 w-3" />
+                    <span>Created {new Date(p.createdAt).toLocaleDateString()}</span>
+                  </div>
+                )}
               </CardHeader>
               <CardContent>
                 <div className="flex gap-2">
-                  <Button asChild size="sm">
+                  <Button asChild size="sm" className="flex-1">
                     <Link href={`/dashboard/${p.id}`}>
                       <FolderOpen className="h-4 w-4 mr-2" />
                       Open Project

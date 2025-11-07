@@ -14,9 +14,7 @@ export function Navbar() {
             PostAPI
           </Link>
           <nav className="hidden md:flex items-center gap-6 ml-8 text-sm text-muted-foreground">
-            <Link href="#features" className="hover:text-foreground">Features</Link>
-            <Link href="#pricing" className="hover:text-foreground">Pricing</Link>
-            <Link href="#docs" className="hover:text-foreground">Docs</Link>
+            <Link href="/dashboard" className="hover:text-foreground transition-colors">Dashboard</Link>
           </nav>
         </div>
         <div className="flex items-center gap-2">

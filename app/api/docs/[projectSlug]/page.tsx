@@ -7,6 +7,7 @@ import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Copy, LinkIcon, Check } from "lucide-react";
@@ -80,20 +81,45 @@ export default function ApiDocsBySlugPage() {
 
   if (loading) {
     return (
-      <main className="mx-auto max-w-6xl px-4 py-10">
-        <p>Loading documentation…</p>
+      <main className="mx-auto max-w-6xl px-4 py-10 space-y-6">
+        <div className="space-y-2">
+          <Skeleton className="h-9 w-64" />
+          <Skeleton className="h-5 w-96" />
+        </div>
+        <Separator />
+        <div className="space-y-4">
+          {[1, 2].map((i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="h-4 w-32 mt-2" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-32 w-full" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </main>
     );
   }
 
   if (error || !project) {
     return (
-      <main className="mx-auto max-w-6xl px-4 py-10 space-y-6">
-        <h1 className="text-2xl font-semibold">API Documentation</h1>
-        <p className="text-sm text-muted-foreground">{error || "Project not found."}</p>
-        <Button asChild variant="outline">
-          <Link href="/dashboard">Back to dashboard</Link>
-        </Button>
+      <main className="mx-auto max-w-6xl px-4 py-10">
+        <Card className="max-w-md mx-auto">
+          <CardHeader>
+            <CardTitle>Documentation not found</CardTitle>
+            <CardDescription>
+              {error || "The project documentation you're looking for doesn't exist or is not available."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline">
+              <Link href="/dashboard">Back to dashboard</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </main>
     );
   }

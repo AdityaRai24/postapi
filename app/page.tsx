@@ -15,11 +15,11 @@ export default function Home() {
             fast.
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
-            <Button asChild>
+            <Button asChild size="lg">
               <Link href="/dashboard">Create your API</Link>
             </Button>
-            <Button asChild variant="outline">
-              <Link href="#docs">Read the docs</Link>
+            <Button asChild variant="outline" size="lg">
+              <Link href="/dashboard">Get started</Link>
             </Button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6">
