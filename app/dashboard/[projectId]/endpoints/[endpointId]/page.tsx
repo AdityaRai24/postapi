@@ -58,6 +58,26 @@ export default function EditEndpointPage() {
   const [jsonText, setJsonText] = useState("{\n  \"hello\": \"world\"\n}");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Detect dark mode
+  useEffect(() => {
+    const checkDarkMode = () => {
+      const isDark = document.documentElement.classList.contains('dark') || 
+                    window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setIsDarkMode(isDark);
+    };
+    
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+    
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -226,8 +246,48 @@ export default function EditEndpointPage() {
         {/* Right panel - JSON Editor/Preview */}
         <Card>
           <CardHeader>
-            <CardTitle>Response JSON</CardTitle>
-            <CardDescription>Update the JSON response for this endpoint</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Response JSON</CardTitle>
+                <CardDescription>Update the JSON response for this endpoint</CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => {
+                    try {
+                      const parsed = JSON.parse(jsonText);
+                      setJsonText(JSON.stringify(parsed, null, 2));
+                      setError(null);
+                      toast.success("JSON formatted!");
+                    } catch {
+                      toast.error("Invalid JSON. Cannot format.");
+                    }
+                  }}
+                  title="Format JSON"
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => {
+                    navigator.clipboard.writeText(jsonText);
+                    setCopied(true);
+                    toast.success("JSON copied to clipboard!");
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  title="Copy JSON"
+                >
+                  {copied ? (
+                    <Check className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="edit" className="w-full">
@@ -236,26 +296,66 @@ export default function EditEndpointPage() {
                 <TabsTrigger value="preview">Preview</TabsTrigger>
               </TabsList>
               <TabsContent value="edit" className="mt-4">
-                <Textarea
-                  rows={20}
-                  value={jsonText}
-                  onChange={(e) => setJsonText(e.target.value)}
-                  placeholder="Enter JSON response..."
-                  className="font-mono text-sm"
-                />
-                {error && <p className="text-sm text-destructive mt-2">{error}</p>}
+                <div className="border rounded-md overflow-hidden">
+                  <CodeMirror
+                    value={jsonText}
+                    height="500px"
+                    extensions={[json()]}
+                    theme={isDarkMode ? oneDark : undefined}
+                    onChange={(value) => {
+                      setJsonText(value);
+                      if (error) {
+                        try {
+                          JSON.parse(value);
+                          setError(null);
+                        } catch {
+                          // Keep error if still invalid
+                        }
+                      }
+                    }}
+                    basicSetup={{
+                      lineNumbers: true,
+                      foldGutter: true,
+                      dropCursor: false,
+                      allowMultipleSelections: false,
+                      indentOnInput: true,
+                      bracketMatching: true,
+                      closeBrackets: true,
+                      autocompletion: false,
+                      highlightSelectionMatches: true,
+                    }}
+                    placeholder="Enter JSON response..."
+                    className="text-sm"
+                  />
+                </div>
+                {error && (
+                  <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md mt-3">
+                    <p className="text-sm text-destructive font-medium">JSON Error</p>
+                    <p className="text-xs text-destructive/80 mt-1">{error}</p>
+                  </div>
+                )}
               </TabsContent>
               <TabsContent value="preview" className="mt-4">
-                <div className="border rounded-md p-4 bg-muted/50 min-h-[400px]">
-                  <pre className="text-sm font-mono whitespace-pre-wrap overflow-auto">
-                    {(() => {
+                <div className="border rounded-md overflow-hidden">
+                  <CodeMirror
+                    value={(() => {
                       try {
                         return JSON.stringify(JSON.parse(jsonText), null, 2);
                       } catch {
                         return "Invalid JSON";
                       }
                     })()}
-                  </pre>
+                    height="500px"
+                    extensions={[json()]}
+                    theme={isDarkMode ? oneDark : undefined}
+                    editable={false}
+                    basicSetup={{
+                      lineNumbers: true,
+                      foldGutter: true,
+                      readOnly: true,
+                    }}
+                    className="text-sm"
+                  />
                 </div>
               </TabsContent>
             </Tabs>

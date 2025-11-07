@@ -22,11 +22,27 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import toast from "react-hot-toast";
-import { Plus, FolderOpen, Rocket, Calendar, Globe } from "lucide-react";
+import { Plus, FolderOpen, Rocket, Calendar, Globe, Trash2, MoreVertical } from "lucide-react";
 import axios from "axios";
 import { useUser } from "@clerk/nextjs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type Project = {
   id: string;
@@ -54,6 +70,9 @@ export default function DashboardPage() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isDeploying, setIsDeploying] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const { user } = useUser();
 
@@ -149,6 +168,31 @@ export default function DashboardPage() {
       toast.error("Failed to deploy project. Please try again.");
     } finally {
       setIsDeploying(false);
+    }
+  }
+
+  async function deleteProject() {
+    if (!projectToDelete || !user?.id) return;
+
+    setIsDeleting(true);
+    try {
+      await axios.delete(`${API_BASE_URL}/api/projects/${projectToDelete.id}`, {
+        headers: {
+          "User-Id": user.id,
+        },
+      });
+
+      toast.success(`Project "${projectToDelete.name}" deleted successfully!`);
+      setDeleteDialogOpen(false);
+      setProjectToDelete(null);
+      
+      // Refresh the projects list
+      fetchProjects();
+    } catch (error) {
+      console.error("Failed to delete project:", error);
+      toast.error("Failed to delete project. Please try again.");
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -302,6 +346,26 @@ export default function DashboardPage() {
                       Open Project
                     </Link>
                   </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <MoreVertical className="h-4 w-4" />
+                        <span className="sr-only">More options</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => {
+                          setProjectToDelete(p);
+                          setDeleteDialogOpen(true);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Project
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </CardContent>
             </Card>
@@ -417,6 +481,50 @@ export default function DashboardPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Project Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Project</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the project
+              {projectToDelete ? ` "${projectToDelete.name}"` : ""} and all its resources, endpoints, and data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {projectToDelete && (
+            <div className="rounded-md border p-3 bg-muted">
+              <div className="font-medium">{projectToDelete.name}</div>
+              {projectToDelete.description && (
+                <div className="mt-1 text-sm text-muted-foreground">{projectToDelete.description}</div>
+              )}
+              {projectToDelete.slug && (
+                <div className="mt-1 font-mono text-xs text-muted-foreground">{projectToDelete.slug}</div>
+              )}
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={deleteProject}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Project
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 }
