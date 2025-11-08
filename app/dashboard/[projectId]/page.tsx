@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { useUser } from "@clerk/nextjs";
-import { Plus, Trash2, Copy, Edit, Rocket, BookText, Check, Home, BarChart3, FolderOpen, Activity } from "lucide-react";
+import { Plus, Trash2, Copy, Edit, Rocket, BookText, Check, BarChart3, FolderOpen, Activity } from "lucide-react";
 import { toast } from "react-hot-toast";
 import axios from "axios";
 

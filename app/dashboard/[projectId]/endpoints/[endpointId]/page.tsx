@@ -19,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useUser } from "@clerk/nextjs";
 import { toast } from "react-hot-toast";
-import { Save, ArrowLeft, Trash2, Settings, Check, Copy } from "lucide-react";
+import { Save, ArrowLeft, Trash2, Settings, Check, Copy, Home } from "lucide-react";
 import axios from "axios";
 import ReactCodeMirror, { oneDark } from "@uiw/react-codemirror";
 import { json } from "@codemirror/lang-json";

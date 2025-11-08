@@ -28,7 +28,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, ArrowLeft, Settings, Copy, Check, Home, FolderOpen, Sparkles } from "lucide-react";
+import { Save, ArrowLeft, Settings, Copy, Check, Home, Sparkles } from "lucide-react";
 import CodeMirror from '@uiw/react-codemirror';
 import { json } from '@codemirror/lang-json';
 import { oneDark } from '@codemirror/theme-one-dark';
@@ -264,7 +264,6 @@ export default function NewEndpointPage() {
     }),
     custom: () => {
       // Generate based on endpoint name if available
-      const name = endpointName.toLowerCase() || 'item';
       return {
         id: faker.string.uuid(),
         name: faker.commerce.productName(),
