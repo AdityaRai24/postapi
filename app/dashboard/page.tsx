@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import toast from "react-hot-toast";
-import { Plus, FolderOpen, Rocket, Calendar, Globe, Trash2, MoreVertical } from "lucide-react";
+import { Plus, FolderOpen, Rocket, Calendar, Globe, Trash2, MoreVertical, Search, BarChart3 } from "lucide-react";
 import axios from "axios";
 import { useUser } from "@clerk/nextjs";
 import { Badge } from "@/components/ui/badge";
@@ -73,6 +73,7 @@ export default function DashboardPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { user } = useUser();
 
@@ -101,6 +102,35 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchProjects();
   }, [fetchProjects]);
+
+  // Keyboard shortcut: Ctrl/Cmd + K to focus search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        const searchInput = document.querySelector('input[placeholder="Search projects..."]') as HTMLInputElement;
+        searchInput?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Filter projects based on search query
+  const filteredProjects = useMemo(() => {
+    if (!searchQuery.trim()) return projects;
+    const query = searchQuery.toLowerCase();
+    return projects.filter(p => 
+      p.name.toLowerCase().includes(query) ||
+      p.description?.toLowerCase().includes(query) ||
+      p.slug?.toLowerCase().includes(query)
+    );
+  }, [projects, searchQuery]);
+
+  // Calculate stats
+  const totalProjects = projects.length;
+  const deployedProjects = projects.filter(p => p.status === 'DEPLOYED').length;
+  const totalEndpoints = projects.reduce((sum, p) => sum + (p.endpoints?.length || 0), 0);
 
   async function createProject() {
     if (!name.trim() || !slug.trim() || !user?.id) return;
@@ -199,18 +229,28 @@ export default function DashboardPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">Manage your APIs and keys.</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Project
-            </Button>
-          </DialogTrigger>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search projects..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 w-64"
+            />
+          </div>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Project
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create a new project</DialogTitle>
@@ -272,7 +312,61 @@ export default function DashboardPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
+
+      {/* Stats Cards */}
+      {projects.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
+              <FolderOpen className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalProjects}</div>
+              <p className="text-xs text-muted-foreground">
+                {deployedProjects} deployed
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Deployed</CardTitle>
+              <Rocket className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{deployedProjects}</div>
+              <p className="text-xs text-muted-foreground">
+                {totalProjects > 0 ? Math.round((deployedProjects / totalProjects) * 100) : 0}% of projects
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Endpoints</CardTitle>
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalEndpoints}</div>
+              <p className="text-xs text-muted-foreground">
+                Across all projects
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Search Results Info */}
+      {searchQuery && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Search className="h-4 w-4" />
+          <span>
+            {filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''} found
+            {filteredProjects.length !== projects.length && ` (filtered from ${projects.length})`}
+          </span>
+        </div>
+      )}
 
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {loading ? (
@@ -289,24 +383,35 @@ export default function DashboardPage() {
               </Card>
             ))}
           </>
-        ) : projects.length === 0 ? (
+        ) : filteredProjects.length === 0 ? (
           <Card className="col-span-full border-dashed">
             <CardHeader className="text-center py-12">
               <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
-                <FolderOpen className="h-6 w-6 text-muted-foreground" />
+                {searchQuery ? (
+                  <Search className="h-6 w-6 text-muted-foreground" />
+                ) : (
+                  <FolderOpen className="h-6 w-6 text-muted-foreground" />
+                )}
               </div>
-              <CardTitle>No projects yet</CardTitle>
+              <CardTitle>
+                {searchQuery ? "No projects found" : "No projects yet"}
+              </CardTitle>
               <CardDescription className="mt-2">
-                Get started by creating your first API project. It only takes a few minutes!
+                {searchQuery 
+                  ? `No projects match "${searchQuery}". Try a different search term.`
+                  : "Get started by creating your first API project. It only takes a few minutes!"
+                }
               </CardDescription>
-              <Button className="mt-6" onClick={() => setOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create your first project
-              </Button>
+              {!searchQuery && (
+                <Button className="mt-6" onClick={() => setOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create your first project
+                </Button>
+              )}
             </CardHeader>
           </Card>
         ) : (
-          projects.map((p) => (
+          filteredProjects.map((p) => (
             <Card key={p.id} className="hover:shadow-md transition-shadow">
               <CardHeader>
                 <div className="flex items-start justify-between">

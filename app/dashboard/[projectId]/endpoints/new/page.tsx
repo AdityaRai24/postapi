@@ -19,13 +19,20 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, ArrowLeft, Wand2, Settings, Copy, Check } from "lucide-react";
-import { JsonView, darkStyles } from 'react-json-view-lite';
-import 'react-json-view-lite/dist/index.css';
+import { Save, ArrowLeft, Settings, Copy, Check, Home, FolderOpen, Sparkles } from "lucide-react";
 import CodeMirror from '@uiw/react-codemirror';
 import { json } from '@codemirror/lang-json';
 import { oneDark } from '@codemirror/theme-one-dark';
+import { faker } from '@faker-js/faker';
 
 // --- TYPES TO MATCH YOUR SPRING BOOT MODELS ---
 type EndPoint = {
@@ -93,6 +100,9 @@ export default function NewEndpointPage() {
   const [selectedMethodForModal, setSelectedMethodForModal] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isGeneratorOpen, setIsGeneratorOpen] = useState(false);
+  const [selectedSchema, setSelectedSchema] = useState<string>("custom");
+  const [itemCount, setItemCount] = useState(5);
   // Detect dark mode
   useEffect(() => {
     const checkDarkMode = () => {
@@ -174,17 +184,109 @@ export default function NewEndpointPage() {
     { key: "DELETE", label: "DELETE", route: `/${baseSlug}/{id}`, method: "DELETE" },
   ];
 
+  // Schema templates for faker.js
+  const schemaTemplates: Record<string, () => Record<string, unknown>> = {
+    user: () => ({
+      id: faker.string.uuid(),
+      firstName: faker.person.firstName(),
+      lastName: faker.person.lastName(),
+      email: faker.internet.email(),
+      phone: faker.phone.number(),
+      avatar: faker.image.avatar(),
+      address: {
+        street: faker.location.streetAddress(),
+        city: faker.location.city(),
+        state: faker.location.state(),
+        zipCode: faker.location.zipCode(),
+        country: faker.location.country(),
+      },
+      createdAt: faker.date.past().toISOString(),
+      updatedAt: faker.date.recent().toISOString(),
+    }),
+    product: () => ({
+      id: faker.string.uuid(),
+      name: faker.commerce.productName(),
+      description: faker.commerce.productDescription(),
+      price: parseFloat(faker.commerce.price()),
+      category: faker.commerce.department(),
+      image: faker.image.urlLoremFlickr({ category: 'business' }),
+      inStock: faker.datatype.boolean(),
+      rating: parseFloat(faker.number.float({ min: 1, max: 5, fractionDigits: 1 }).toFixed(1)),
+      reviews: faker.number.int({ min: 0, max: 1000 }),
+      createdAt: faker.date.past().toISOString(),
+      updatedAt: faker.date.recent().toISOString(),
+    }),
+    order: () => ({
+      id: faker.string.uuid(),
+      orderNumber: faker.string.alphanumeric(10).toUpperCase(),
+      customerId: faker.string.uuid(),
+      customerName: faker.person.fullName(),
+      items: Array.from({ length: faker.number.int({ min: 1, max: 5 }) }, () => ({
+        productId: faker.string.uuid(),
+        productName: faker.commerce.productName(),
+        quantity: faker.number.int({ min: 1, max: 10 }),
+        price: parseFloat(faker.commerce.price()),
+      })),
+      total: parseFloat(faker.commerce.price({ min: 10, max: 1000 })),
+      status: faker.helpers.arrayElement(['pending', 'processing', 'shipped', 'delivered', 'cancelled']),
+      shippingAddress: faker.location.streetAddress(),
+      createdAt: faker.date.past().toISOString(),
+      updatedAt: faker.date.recent().toISOString(),
+    }),
+    blog: () => ({
+      id: faker.string.uuid(),
+      title: faker.lorem.sentence(),
+      slug: faker.lorem.slug(),
+      content: faker.lorem.paragraphs(3),
+      excerpt: faker.lorem.sentence(),
+      author: faker.person.fullName(),
+      authorEmail: faker.internet.email(),
+      category: faker.helpers.arrayElement(['Technology', 'Business', 'Lifestyle', 'Travel', 'Food']),
+      tags: faker.helpers.arrayElements(['web', 'design', 'development', 'tutorial', 'tips'], { min: 2, max: 4 }),
+      image: faker.image.urlLoremFlickr({ category: 'nature' }),
+      views: faker.number.int({ min: 0, max: 10000 }),
+      published: faker.datatype.boolean(),
+      createdAt: faker.date.past().toISOString(),
+      updatedAt: faker.date.recent().toISOString(),
+    }),
+    comment: () => ({
+      id: faker.string.uuid(),
+      postId: faker.string.uuid(),
+      author: faker.person.fullName(),
+      authorEmail: faker.internet.email(),
+      content: faker.lorem.paragraph(),
+      avatar: faker.image.avatar(),
+      likes: faker.number.int({ min: 0, max: 100 }),
+      replies: faker.number.int({ min: 0, max: 10 }),
+      approved: faker.datatype.boolean(),
+      createdAt: faker.date.past().toISOString(),
+      updatedAt: faker.date.recent().toISOString(),
+    }),
+    custom: () => {
+      // Generate based on endpoint name if available
+      const name = endpointName.toLowerCase() || 'item';
+      return {
+        id: faker.string.uuid(),
+        name: faker.commerce.productName(),
+        description: faker.lorem.sentence(),
+        status: faker.helpers.arrayElement(['active', 'inactive', 'pending']),
+        createdAt: faker.date.past().toISOString(),
+        updatedAt: faker.date.recent().toISOString(),
+      };
+    },
+  };
+
   const generateMockData = () => {
-    const sampleItem = {
-      id: 1,
-      name: `Sample ${endpointName || 'Item'}`,
-      description: `A sample ${endpointName?.toLowerCase() || 'item'}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    const sampleData = [sampleItem, { ...sampleItem, id: 2, name: `${sampleItem.name} 2` }];
-    setJsonSchema(JSON.stringify(sampleData, null, 2));
+    setIsGeneratorOpen(true);
+  };
+
+  const handleGenerateData = () => {
+    const generator = schemaTemplates[selectedSchema] || schemaTemplates.custom;
+    const generatedData = Array.from({ length: itemCount }, () => generator());
+    setJsonSchema(JSON.stringify(generatedData, null, 2));
     setJsonError(null);
+    setIsGeneratorOpen(false);
+    toast.success(`Generated ${itemCount} ${selectedSchema} item(s)!`);
   };
 
   const handleCopyJson = () => {
@@ -354,6 +456,28 @@ export default function NewEndpointPage() {
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-10 space-y-6">
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href="/dashboard">
+                <Home className="h-4 w-4" />
+              </Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href={`/dashboard/${projectId}`}>{project.name}</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>Create Resource</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">
           Create Resource
@@ -475,12 +599,17 @@ export default function NewEndpointPage() {
           <CardContent>
             <div className="space-y-4">
               <Button variant="outline" size="sm" onClick={generateMockData} className="w-full">
-                <Wand2 className="h-4 w-4 mr-2" />
+                <Sparkles className="h-4 w-4 mr-2" />
                 Generate Sample Data
               </Button>
               
               <div className="space-y-2">
-                <Label htmlFor="json-data">JSON Data (array of objects)</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="json-data">JSON Data (array of objects)</Label>
+                  <span className="text-xs text-muted-foreground">
+                    {jsonSchema.split('\n').length} line{jsonSchema.split('\n').length !== 1 ? 's' : ''}
+                  </span>
+                </div>
                 <div className="border rounded-md overflow-hidden">
                   <CodeMirror
                     value={jsonSchema}
@@ -540,32 +669,6 @@ export default function NewEndpointPage() {
                     // Ignore parse errors here, they're handled above
                   }
                   return null;
-                })()}
-                {/* Try parsing, show preview if valid */}
-                {(() => {
-                  try {
-                    const parsed = JSON.parse(jsonSchema);
-                    if (Array.isArray(parsed) && parsed.length > 0) {
-                      return (
-                        <div className="border border-border rounded-md mt-3 bg-background overflow-hidden">
-                          <div className="p-2 bg-muted border-b border-border">
-                            <p className="text-xs font-medium">Preview ({parsed.length} items)</p>
-                          </div>
-                          <div className="max-h-[200px] overflow-auto">
-                            <JsonView 
-                              data={parsed} 
-                              clickToExpandNode={true} 
-                              shouldExpandNode={() => false}
-                              style={isDarkMode ? darkStyles : undefined} 
-                            />
-                          </div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  } catch {
-                    return null;
-                  }
                 })()}
               </div>
             </div>
@@ -686,6 +789,74 @@ export default function NewEndpointPage() {
               </div>
             </div>
           )}
+          </DialogContent>
+        </Dialog>
+
+      {/* Sample Data Generator Dialog */}
+      <Dialog open={isGeneratorOpen} onOpenChange={setIsGeneratorOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5" />
+              Generate Sample Data
+            </DialogTitle>
+            <DialogDescription>
+              Choose a schema template and number of items to generate realistic sample data using Faker.js
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="schema-select">Schema Template</Label>
+              <Select value={selectedSchema} onValueChange={setSelectedSchema}>
+                <SelectTrigger id="schema-select">
+                  <SelectValue placeholder="Select a schema" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">User - Personal information, address, contact</SelectItem>
+                  <SelectItem value="product">Product - E-commerce product details</SelectItem>
+                  <SelectItem value="order">Order - Order with items and customer info</SelectItem>
+                  <SelectItem value="blog">Blog Post - Article with content and metadata</SelectItem>
+                  <SelectItem value="comment">Comment - User comments with engagement</SelectItem>
+                  <SelectItem value="custom">Custom - Basic template based on resource name</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="item-count">Number of Items</Label>
+              <Input
+                id="item-count"
+                type="number"
+                min="1"
+                max="100"
+                value={itemCount}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  if (!isNaN(val) && val > 0 && val <= 100) {
+                    setItemCount(val);
+                  }
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                Generate between 1 and 100 items
+              </p>
+            </div>
+            <div className="p-3 bg-muted rounded-lg">
+              <p className="text-xs font-medium mb-1">Preview:</p>
+              <p className="text-xs text-muted-foreground">
+                Will generate {itemCount} {selectedSchema === 'custom' ? 'item' : selectedSchema}
+                {itemCount !== 1 ? 's' : ''} with realistic sample data
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setIsGeneratorOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleGenerateData}>
+              <Sparkles className="h-4 w-4 mr-2" />
+              Generate Data
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </main>

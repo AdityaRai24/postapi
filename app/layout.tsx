@@ -38,7 +38,29 @@ export default function RootLayout({
             <UserProvider>
               <Navbar />
               {children}
-              <Toaster/>
+              <Toaster
+                position="top-right"
+                toastOptions={{
+                  duration: 3000,
+                  style: {
+                    background: 'var(--background)',
+                    color: 'var(--foreground)',
+                    border: '1px solid var(--border)',
+                  },
+                  success: {
+                    iconTheme: {
+                      primary: 'hsl(142, 76%, 36%)',
+                      secondary: 'white',
+                    },
+                  },
+                  error: {
+                    iconTheme: {
+                      primary: 'hsl(0, 84%, 60%)',
+                      secondary: 'white',
+                    },
+                  },
+                }}
+              />
             </UserProvider>
           </ThemeProvider>
         </body>

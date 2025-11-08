@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -8,8 +8,17 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { useUser } from "@clerk/nextjs";
-import { Plus, Trash2, Copy, Edit, Rocket, BookText, Check } from "lucide-react";
+import { Plus, Trash2, Copy, Edit, Rocket, BookText, Check, Home, BarChart3, FolderOpen, Activity } from "lucide-react";
 import { toast } from "react-hot-toast";
 import axios from "axios";
 
@@ -36,6 +45,11 @@ type Resource = {
   updatedAt: string;
 };
 
+type ProjectUsage = {
+  currentUsage: number;
+  maxLimit: number;
+};
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
 
 export default function ProjectDetailPage() {
@@ -51,6 +65,8 @@ export default function ProjectDetailPage() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [showDeployDialog, setShowDeployDialog] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
+  const [usage, setUsage] = useState<ProjectUsage | null>(null);
+  const [isLoadingUsage, setIsLoadingUsage] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -69,6 +85,23 @@ export default function ProjectDetailPage() {
         if (!cancelled) {
           setResources(Array.isArray(resourcesRes.data) ? resourcesRes.data : []);
         }
+
+        // Get usage data
+        try {
+          const usageRes = await axios.get(`${API_BASE_URL}/api/projects/${projectId}/usage`, {
+            headers: { "User-Id": user?.id || "" },
+          });
+          if (!cancelled) {
+            setUsage(usageRes.data);
+          }
+        } catch (usageError) {
+          console.error("Failed to load usage data:", usageError);
+          if (!cancelled) {
+            setUsage(null);
+          }
+        } finally {
+          if (!cancelled) setIsLoadingUsage(false);
+        }
       } catch (e) {
         console.error("Failed to load project/resources from API:", e);
         if (!cancelled) {
@@ -83,7 +116,7 @@ export default function ProjectDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [projectId]);
+  }, [projectId, user?.id]);
 
 
   if (isLoading) {
@@ -131,25 +164,47 @@ export default function ProjectDetailPage() {
     );
   }
 
+  const totalResources = resources.length;
+  const totalEndpoints = resources.reduce((sum, r) => sum + (r.enabledMethods?.length || 0), 0);
+
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 space-y-6">
-      <div className="flex items-center justify-between">
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href="/dashboard">Dashboard</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>{project.name}</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">{project.name}</h1>
-          <p className="text-muted-foreground">Manage endpoints for this project.</p>
+          <p className="text-muted-foreground">
+            {project.description || "Manage endpoints for this project."}
+          </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {project.slug && (
-            <>
-              <Button asChild variant="outline" disabled={resources.length === 0}>
-                <Link href={`/api/docs/${project.slug}`}>
-                  <BookText className="h-4 w-4 mr-2" />
-                  Documentation
-                </Link>
-              </Button>
-            </>
+            <Button 
+              asChild 
+              variant="outline" 
+              disabled={resources.length === 0}
+              size="sm"
+            >
+              <Link href={`/api/docs/${project.slug}`} target="_blank">
+                <BookText className="h-4 w-4 mr-2" />
+                Documentation
+              </Link>
+            </Button>
           )}
-          <Button asChild>
+          <Button asChild size="sm">
             <Link href={`/dashboard/${project.id}/endpoints/new`}>
               <Plus className="h-4 w-4 mr-2" />
               New Resource
@@ -160,6 +215,7 @@ export default function ProjectDetailPage() {
               variant="default"
               onClick={() => setShowDeployDialog(true)}
               className="bg-green-600 hover:bg-green-700 text-white"
+              size="sm"
             >
               <Rocket className="h-4 w-4 mr-2" />
               Deploy
@@ -168,10 +224,97 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Resources</CardTitle>
+            <FolderOpen className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalResources}</div>
+            <p className="text-xs text-muted-foreground">
+              Total resources
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Endpoints</CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalEndpoints}</div>
+            <p className="text-xs text-muted-foreground">
+              Active endpoints
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Status</CardTitle>
+            <Rocket className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {project.status === 'DEPLOYED' ? 'Live' : 'Draft'}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {project.status || 'DRAFT'}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">API Usage</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {isLoadingUsage ? (
+              <div className="space-y-2">
+                <Skeleton className="h-6 w-16" />
+                <Skeleton className="h-2 w-full" />
+              </div>
+            ) : usage ? (() => {
+              const usagePercent = (usage.currentUsage / usage.maxLimit) * 100;
+              const isHighUsage = usagePercent >= 80;
+              const isWarningUsage = usagePercent >= 60;
+              
+              return (
+                <div className="space-y-2">
+                  <div className="text-2xl font-bold">
+                    {usage.currentUsage.toLocaleString()}
+                    <span className="text-sm font-normal text-muted-foreground ml-1">
+                      / {usage.maxLimit.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <Progress 
+                      value={usagePercent} 
+                      className={`h-2 ${isHighUsage ? '[&>div]:bg-red-500' : isWarningUsage ? '[&>div]:bg-orange-500' : ''}`}
+                    />
+                  </div>
+                  <p className={`text-xs ${isHighUsage ? 'text-red-600 dark:text-red-400 font-medium' : isWarningUsage ? 'text-orange-600 dark:text-orange-400' : 'text-muted-foreground'}`}>
+                    {usagePercent.toFixed(1)}% of limit used
+                    {isHighUsage && ' - Near limit!'}
+                  </p>
+                </div>
+              );
+            })() : (
+              <div className="text-sm text-muted-foreground">
+                Usage data unavailable
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       {resources.length === 0 && (
-        <p className="text-sm text-muted-foreground">
-          Deploy and Documentation will be enabled after you create at least one resource.
-        </p>
+        <div className="p-4 bg-muted/50 border border-dashed rounded-lg">
+          <p className="text-sm text-muted-foreground">
+            Deploy and Documentation will be enabled after you create at least one resource.
+          </p>
+        </div>
       )}
 
       <Separator />
@@ -207,25 +350,34 @@ export default function ProjectDetailPage() {
             };
             
             return (
-              <Card key={resource.id}>
+              <Card key={resource.id} className="hover:shadow-lg transition-all duration-200 group">
                 <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold">{resource.name}</h3>
-                      <code className="text-sm font-mono text-muted-foreground">/{resource.slug}</code>
+                  <CardTitle className="flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg font-semibold truncate">{resource.name}</h3>
+                      <code className="text-xs font-mono text-muted-foreground">/{resource.slug}</code>
                     </div>
-                    <Button size="sm" variant="ghost" onClick={() => {
-                      navigator.clipboard.writeText(baseUrl);
-                      toast.success("Copied to clipboard");
-                      const key = `base-${resource.id}`;
-                      setCopiedKey(key);
-                      setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 2000);
-                    }}>
-                      {copiedKey === `base-${resource.id}` ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => {
+                        navigator.clipboard.writeText(baseUrl);
+                        toast.success("Copied to clipboard");
+                        const key = `base-${resource.id}`;
+                        setCopiedKey(key);
+                        setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 2000);
+                      }}
+                    >
+                      {copiedKey === `base-${resource.id}` ? (
+                        <Check className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
                     </Button>
                   </CardTitle>
                   {resource.description && (
-                    <CardDescription>{resource.description}</CardDescription>
+                    <CardDescription className="line-clamp-2">{resource.description}</CardDescription>
                   )}
                 </CardHeader>
                 <CardContent>
