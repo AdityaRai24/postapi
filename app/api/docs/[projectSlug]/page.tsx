@@ -51,18 +51,18 @@ export default function ApiDocsBySlugPage() {
   // Detect dark mode
   useEffect(() => {
     const checkDarkMode = () => {
-      const isDark = document.documentElement.classList.contains('dark') || 
-                    window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const isDark = document.documentElement.classList.contains('dark') ||
+        window.matchMedia('(prefers-color-scheme: dark)').matches;
       setIsDarkMode(isDark);
     };
-    
+
     checkDarkMode();
     const observer = new MutationObserver(checkDarkMode);
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['class'],
     });
-    
+
     return () => observer.disconnect();
   }, []);
 
@@ -131,7 +131,7 @@ export default function ApiDocsBySlugPage() {
   const generateCodeExample = (method: string, path: string, resource: Resource, example?: unknown) => {
     const fullUrl = `${baseApiUrl}${path}`;
     const exampleData = example || (Array.isArray(resource.mockData) ? resource.mockData[0] : resource.mockData);
-    
+
     switch (selectedExample[`${resource.id}-${method}`] || 'curl') {
       case 'curl':
         if (method === 'GET') {
@@ -144,7 +144,7 @@ export default function ApiDocsBySlugPage() {
           return `curl -X DELETE "${fullUrl.replace('{id}', '1')}" \\\n  -H "accept: application/json"`;
         }
         return `curl -X ${method} "${fullUrl}" \\\n  -H "accept: application/json"`;
-      
+
       case 'javascript':
         if (method === 'GET') {
           return `fetch('${fullUrl}')\n  .then(response => response.json())\n  .then(data => console.log(data))\n  .catch(error => console.error('Error:', error));`;
@@ -156,7 +156,7 @@ export default function ApiDocsBySlugPage() {
           return `fetch('${fullUrl.replace('{id}', '1')}', {\n  method: 'DELETE'\n})\n  .then(response => response.json())\n  .then(data => console.log(data))\n  .catch(error => console.error('Error:', error));`;
         }
         return `fetch('${fullUrl}', { method: '${method}' })`;
-      
+
       case 'python':
         if (method === 'GET') {
           return `import requests\n\nresponse = requests.get('${fullUrl}')\nprint(response.json())`;
@@ -168,7 +168,7 @@ export default function ApiDocsBySlugPage() {
           return `import requests\n\nresponse = requests.delete('${fullUrl.replace('{id}', '1')}')\nprint(response.json())`;
         }
         return `import requests\n\nresponse = requests.${method.toLowerCase()}('${fullUrl}')`;
-      
+
       default:
         return '';
     }
@@ -220,16 +220,24 @@ export default function ApiDocsBySlugPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-10 space-y-8">
+    <main className="mx-auto max-w-7xl px-4 py-10 space-y-8">
+      {/* Background Elements */}
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+        <div className="absolute left-0 right-0 top-0 -z-10 m-auto h-[310px] w-[310px] rounded-full bg-primary/20 opacity-20 blur-[100px]"></div>
+      </div>
+
       <header className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-3">
-              <BookOpen className="h-8 w-8 text-primary" />
-              <h1 className="text-3xl font-semibold tracking-tight">API Documentation</h1>
+              <div className="p-2 bg-primary/10 rounded-lg backdrop-blur-sm border border-primary/20">
+                <BookOpen className="h-6 w-6 text-primary" />
+              </div>
+              <h1 className="text-3xl font-semibold tracking-tight gradient-text">API Documentation</h1>
             </div>
-            <div className="flex items-center gap-2 ml-11">
-              <p className="text-lg font-medium">{project.name}</p>
+            <div className="flex items-center gap-2 ml-1">
+              <p className="text-lg font-medium text-foreground/90">{project.name}</p>
               {project.description && (
                 <>
                   <span className="text-muted-foreground">•</span>
@@ -239,7 +247,7 @@ export default function ApiDocsBySlugPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button asChild variant="outline">
+            <Button asChild variant="outline" className="bg-background/50 backdrop-blur-sm">
               <Link href="/dashboard">
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Dashboard
@@ -248,6 +256,7 @@ export default function ApiDocsBySlugPage() {
             <Button
               onClick={() => copyToClipboard(baseApiUrl, "base")}
               variant="secondary"
+              className="bg-secondary/50 backdrop-blur-sm hover:bg-secondary/70"
             >
               {copiedKey === "base" ? (
                 <Check className="h-4 w-4 mr-2 text-green-600" />
@@ -260,22 +269,22 @@ export default function ApiDocsBySlugPage() {
         </div>
       </header>
 
-      <Card className="bg-muted/50">
+      <Card className="bg-card/40 backdrop-blur-md border-muted-foreground/10 shadow-sm">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <LinkIcon className="h-5 w-5" />
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <LinkIcon className="h-4 w-4 text-primary" />
             Base URL
           </CardTitle>
           <CardDescription>The root URL for all endpoints in this project. Use this as the prefix for all API calls.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between rounded-md border bg-background p-4 font-mono text-sm">
-            <code className="flex-1 break-all">{baseApiUrl}</code>
+          <div className="flex items-center justify-between rounded-md border border-border/50 bg-background/50 p-4 font-mono text-sm shadow-inner">
+            <code className="flex-1 break-all text-primary">{baseApiUrl}</code>
             <Button
               size="sm"
               variant="ghost"
               onClick={() => copyToClipboard(baseApiUrl, "inline-base")}
-              className="ml-2 shrink-0"
+              className="ml-2 shrink-0 hover:bg-primary/10 hover:text-primary"
             >
               {copiedKey === "inline-base" ? (
                 <Check className="h-4 w-4 text-green-600" />
@@ -287,230 +296,238 @@ export default function ApiDocsBySlugPage() {
         </CardContent>
       </Card>
 
-      <Separator />
+      <Separator className="bg-border/40" />
 
       {resources.length === 0 ? (
-        <Card className="border-dashed">
+        <Card className="border-dashed bg-muted/20 border-muted-foreground/20 max-w-2xl mx-auto">
           <CardHeader className="text-center py-12">
-            <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <div className="p-4 bg-background/50 rounded-full w-fit mx-auto mb-4 border border-border/50">
+              <BookOpen className="h-8 w-8 text-muted-foreground" />
+            </div>
             <CardTitle>No resources found</CardTitle>
-            <CardDescription className="mt-2">
+            <CardDescription className="mt-2 max-w-md mx-auto">
               This project has no resources yet. Create resources in your dashboard to see them here.
             </CardDescription>
-            <Button asChild className="mt-6">
+            <Button asChild className="mt-6 w-fit mx-auto">
               <Link href="/dashboard">Go to Dashboard</Link>
             </Button>
           </CardHeader>
         </Card>
       ) : (
-        <section className="space-y-4">
+        <section className="space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-semibold">Resources</h2>
-            <Badge variant="secondary">{resources.length} resource{resources.length !== 1 ? 's' : ''}</Badge>
+            <h2 className="text-2xl font-semibold tracking-tight">Resources</h2>
+            <Badge variant="secondary" className="bg-secondary/50 backdrop-blur-sm">{resources.length} resource{resources.length !== 1 ? 's' : ''}</Badge>
           </div>
-          
-          {resources.map((r) => {
-            // Build a minimal example from mockData if available
-            let example: unknown = r.mockData;
-            if (Array.isArray(example)) {
-              example = example[0];
-            }
-            
-            const endpoints = [
-              { method: "GET", path: `/${r.slug}`, summary: `List all ${r.name}`, id: 'GET' },
-              { method: "POST", path: `/${r.slug}`, summary: `Create a new ${r.name}`, id: 'POST' },
-              { method: "GET", path: `/${r.slug}/{id}`, summary: `Get ${r.name} by ID`, id: 'GET_BY_ID' },
-              { method: "PUT", path: `/${r.slug}/{id}`, summary: `Update ${r.name}`, id: 'PUT' },
-              { method: "DELETE", path: `/${r.slug}/{id}`, summary: `Delete ${r.name}`, id: 'DELETE' },
-            ].filter(e => r.enabledMethods.includes(e.id));
 
-            const isExpanded = expandedResources.has(r.id);
+          <div className="grid gap-4">
+            {resources.map((r) => {
+              // Build a minimal example from mockData if available
+              let example: unknown = r.mockData;
+              if (Array.isArray(example)) {
+                example = example[0];
+              }
 
-            return (
-              <Card key={r.id} className="overflow-hidden">
-                <CardHeader 
-                  className="cursor-pointer hover:bg-muted/50 transition-colors"
-                  onClick={() => toggleResource(r.id)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="flex items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          {isExpanded ? (
-                            <ChevronUp className="h-5 w-5 text-muted-foreground" />
-                          ) : (
+              const endpoints = [
+                { method: "GET", path: `/${r.slug}`, summary: `List all ${r.name}`, id: 'GET' },
+                { method: "POST", path: `/${r.slug}`, summary: `Create a new ${r.name}`, id: 'POST' },
+                { method: "GET", path: `/${r.slug}/{id}`, summary: `Get ${r.name} by ID`, id: 'GET_BY_ID' },
+                { method: "PUT", path: `/${r.slug}/{id}`, summary: `Update ${r.name}`, id: 'PUT' },
+                { method: "DELETE", path: `/${r.slug}/{id}`, summary: `Delete ${r.name}`, id: 'DELETE' },
+              ].filter(e => r.enabledMethods.includes(e.id));
+
+              const isExpanded = expandedResources.has(r.id);
+
+              return (
+                <Card key={r.id} className={`overflow-hidden transition-all duration-200 border-muted-foreground/10 ${isExpanded ? 'bg-card/60 backdrop-blur-md shadow-md ring-1 ring-primary/20' : 'bg-card/40 backdrop-blur-sm hover:bg-card/60 hover:shadow-sm'}`}>
+                  <CardHeader
+                    className="cursor-pointer transition-colors p-6"
+                    onClick={() => toggleResource(r.id)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-1">
+                          <div className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
                             <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                          )}
-                          <span className="text-xl">{r.name}</span>
-                        </div>
-                        <Badge variant="outline" className="ml-2">
-                          {endpoints.length} endpoint{endpoints.length !== 1 ? 's' : ''}
-                        </Badge>
-                      </CardTitle>
-                      {r.description && (
-                        <CardDescription className="mt-2">{r.description}</CardDescription>
-                      )}
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        copyToClipboard(`${baseApiUrl}/${r.slug}`, `res-${r.id}`);
-                      }}
-                    >
-                      {copiedKey === `res-${r.id}` ? (
-                        <Check className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <LinkIcon className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </CardHeader>
-                
-                {isExpanded && (
-                  <CardContent className="space-y-6 pt-0">
-                    {endpoints.map((e, idx) => {
-                      const endpointKey = `${r.id}-${e.method}-${idx}`;
-                      const codeExample = generateCodeExample(e.method, e.path, r, example);
-                      
-                      return (
-                        <div key={idx} className="border rounded-lg p-4 space-y-4">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 space-y-2">
-                              <div className="flex items-center gap-3">
-                                <Badge className={methodColor[e.method] || "bg-muted"}>
-                                  {e.method}
-                                </Badge>
-                                <code className="text-sm font-mono bg-muted px-2 py-1 rounded">
-                                  {e.path}
-                                </code>
-                              </div>
-                              <p className="text-sm text-muted-foreground">{e.summary}</p>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => copyToClipboard(`${baseApiUrl}${e.path}`, `ep-${endpointKey}`)}
-                            >
-                              {copiedKey === `ep-${endpointKey}` ? (
-                                <Check className="h-4 w-4 text-green-600" />
-                              ) : (
-                                <Copy className="h-4 w-4" />
-                              )}
-                            </Button>
                           </div>
+                          <CardTitle className="text-xl font-semibold">{r.name}</CardTitle>
+                          <Badge variant="outline" className="ml-2 bg-background/50 backdrop-blur-sm text-xs border-primary/20 text-primary">
+                            {endpoints.length} endpoint{endpoints.length !== 1 ? 's' : ''}
+                          </Badge>
+                        </div>
+                        {r.description && (
+                          <CardDescription className="ml-8">{r.description}</CardDescription>
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-muted-foreground hover:text-foreground"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          copyToClipboard(`${baseApiUrl}/${r.slug}`, `res-${r.id}`);
+                        }}
+                      >
+                        {copiedKey === `res-${r.id}` ? (
+                          <Check className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <LinkIcon className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </CardHeader>
 
-                          <Tabs defaultValue="curl" className="w-full">
-                            <div className="flex items-center justify-between mb-2">
-                              <TabsList>
-                                <TabsTrigger value="curl" onClick={() => setSelectedExample(prev => ({ ...prev, [`${r.id}-${e.method}`]: 'curl' }))}>
-                                  <Terminal className="h-3 w-3 mr-1" />
-                                  cURL
-                                </TabsTrigger>
-                                <TabsTrigger value="javascript" onClick={() => setSelectedExample(prev => ({ ...prev, [`${r.id}-${e.method}`]: 'javascript' }))}>
-                                  <Code2 className="h-3 w-3 mr-1" />
-                                  JavaScript
-                                </TabsTrigger>
-                                <TabsTrigger value="python" onClick={() => setSelectedExample(prev => ({ ...prev, [`${r.id}-${e.method}`]: 'python' }))}>
-                                  <Code2 className="h-3 w-3 mr-1" />
-                                  Python
-                                </TabsTrigger>
-                              </TabsList>
+                  {isExpanded && (
+                    <CardContent className="space-y-6 pt-0 px-6 pb-6">
+                      <Separator className="mb-6 bg-border/50" />
+                      {endpoints.map((e, idx) => {
+                        const endpointKey = `${r.id}-${e.method}-${idx}`;
+                        const codeExample = generateCodeExample(e.method, e.path, r, example);
+
+                        // Method Colors (Consistent with Dashboard)
+                        const badgeVariant =
+                          e.method === "GET" ? "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20 hover:bg-green-500/20" :
+                            e.method === "POST" ? "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20 hover:bg-blue-500/20" :
+                              e.method === "PUT" ? "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20 hover:bg-orange-500/20" :
+                                e.method === "DELETE" ? "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20 hover:bg-red-500/20" :
+                                  "bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/20";
+
+                        return (
+                          <div key={idx} className="border border-border/50 rounded-lg overflow-hidden bg-background/40">
+                            <div className="p-4 flex items-center justify-between gap-4 bg-muted/30 border-b border-border/50">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-3 flex-wrap">
+                                  <Badge variant="outline" className={`${badgeVariant} border font-mono font-bold tracking-wider`}>
+                                    {e.method}
+                                  </Badge>
+                                  <code className="text-sm font-mono text-foreground/90 break-all">
+                                    {e.path}
+                                  </code>
+                                </div>
+                              </div>
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => copyToClipboard(codeExample, `code-${endpointKey}`)}
+                                className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                                onClick={() => copyToClipboard(`${baseApiUrl}${e.path}`, `ep-${endpointKey}`)}
                               >
-                                {copiedKey === `code-${endpointKey}` ? (
-                                  <Check className="h-4 w-4 text-green-600 mr-1" />
+                                {copiedKey === `ep-${endpointKey}` ? (
+                                  <Check className="h-3.5 w-3.5 text-green-600 mr-1.5" />
                                 ) : (
-                                  <Copy className="h-4 w-4 mr-1" />
+                                  <Copy className="h-3.5 w-3.5 mr-1.5" />
                                 )}
-                                Copy
+                                URL
                               </Button>
                             </div>
-                            
-                            <TabsContent value="curl" className="mt-0">
-                              <div className="border rounded-md overflow-hidden">
-                                <CodeMirror
-                                  value={codeExample}
-                                  height="auto"
-                                  minHeight="100px"
-                                  extensions={[]}
-                                  theme={isDarkMode ? oneDark : undefined}
-                                  editable={false}
-                                  basicSetup={{
-                                    lineNumbers: true,
-                                  }}
-                                  className="text-sm"
-                                />
-                              </div>
-                            </TabsContent>
-                            
-                            <TabsContent value="javascript" className="mt-0">
-                              <div className="border rounded-md overflow-hidden">
-                                <CodeMirror
-                                  value={codeExample}
-                                  height="auto"
-                                  minHeight="100px"
-                                  extensions={[]}
-                                  theme={isDarkMode ? oneDark : undefined}
-                                  editable={false}
-                                  basicSetup={{
-                                    lineNumbers: true,
-                                  }}
-                                  className="text-sm"
-                                />
-                              </div>
-                            </TabsContent>
-                            
-                            <TabsContent value="python" className="mt-0">
-                              <div className="border rounded-md overflow-hidden">
-                                <CodeMirror
-                                  value={codeExample}
-                                  height="auto"
-                                  minHeight="100px"
-                                  extensions={[]}
-                                  theme={isDarkMode ? oneDark : undefined}
-                                  editable={false}
-                                  basicSetup={{
-                                    lineNumbers: true,
-                                  }}
-                                  className="text-sm"
-                                />
-                              </div>
-                            </TabsContent>
-                          </Tabs>
 
-                          {example != null && (e.method === 'GET' || e.method === 'POST' || e.method === 'PUT') && (
-                            <div className="space-y-2">
-                              <div className="text-sm font-medium">Example Response</div>
-                              <div className="border rounded-md overflow-hidden">
-                                <CodeMirror
-                                  value={JSON.stringify(example as Record<string, unknown>, null, 2)}
-                                  height="auto"
-                                  minHeight="150px"
-                                  extensions={[json()]}
-                                  theme={isDarkMode ? oneDark : undefined}
-                                  editable={false}
-                                  basicSetup={{
-                                    lineNumbers: true,
-                                    foldGutter: true,
-                                  }}
-                                  className="text-sm"
-                                />
+                            <div className="p-4 space-y-4">
+                              <p className="text-sm text-muted-foreground">{e.summary}</p>
+
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                {/* Request Section */}
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Request</div>
+                                  </div>
+                                  <Tabs defaultValue="curl" className="w-full">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <TabsList className="h-8 bg-muted/50 p-0.5">
+                                        <TabsTrigger value="curl" className="text-xs h-7 data-[state=active]:bg-background/80" onClick={() => setSelectedExample(prev => ({ ...prev, [`${r.id}-${e.method}`]: 'curl' }))}>
+                                          cURL
+                                        </TabsTrigger>
+                                        <TabsTrigger value="javascript" className="text-xs h-7 data-[state=active]:bg-background/80" onClick={() => setSelectedExample(prev => ({ ...prev, [`${r.id}-${e.method}`]: 'javascript' }))}>
+                                          JS
+                                        </TabsTrigger>
+                                        <TabsTrigger value="python" className="text-xs h-7 data-[state=active]:bg-background/80" onClick={() => setSelectedExample(prev => ({ ...prev, [`${r.id}-${e.method}`]: 'python' }))}>
+                                          Python
+                                        </TabsTrigger>
+                                      </TabsList>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-7 w-7 p-0"
+                                        onClick={() => copyToClipboard(codeExample, `code-${endpointKey}`)}
+                                      >
+                                        {copiedKey === `code-${endpointKey}` ? (
+                                          <Check className="h-3.5 w-3.5 text-green-600" />
+                                        ) : (
+                                          <Copy className="h-3.5 w-3.5" />
+                                        )}
+                                      </Button>
+                                    </div>
+
+                                    <div className="relative">
+                                      {/* Window Controls Decoration */}
+                                      <div className="absolute top-0 left-0 right-0 h-6 bg-muted/80 backdrop-blur border-b border-border/50 flex items-center px-2 gap-1.5 z-10 rounded-t-md">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/30"></div>
+                                        <div className="w-2.5 h-2.5 rounded-full bg-amber-500/20 border border-amber-500/30"></div>
+                                        <div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/30"></div>
+                                      </div>
+
+                                      {['curl', 'javascript', 'python'].map((lang) => (
+                                        <TabsContent key={lang} value={lang} className="mt-0">
+                                          <div className="border border-border/50 rounded-md overflow-hidden pt-6 bg-[#282c34] shadow-inner">
+                                            <CodeMirror
+                                              value={codeExample}
+                                              height="auto"
+                                              minHeight="100px"
+                                              extensions={[]}
+                                              theme={oneDark} // Force dark theme for code blocks for better contrast
+                                              editable={false}
+                                              basicSetup={{
+                                                lineNumbers: false,
+                                                foldGutter: false,
+                                              }}
+                                              className="text-xs"
+                                            />
+                                          </div>
+                                        </TabsContent>
+                                      ))}
+                                    </div>
+                                  </Tabs>
+                                </div>
+
+                                {/* Response Section */}
+                                {example != null && (e.method === 'GET' || e.method === 'POST' || e.method === 'PUT') && (
+                                  <div className="space-y-2">
+                                    <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Response (200 OK)</div>
+
+                                    <div className="relative mt-[42px]"> {/* Align with code block content start (tabs + window header height approx) -> actually let's just make it visually consistent */}
+                                      <div className="absolute top-0 left-0 right-0 h-6 bg-muted/80 backdrop-blur border-b border-border/50 flex items-center px-2 justify-between z-10 rounded-t-md">
+                                        <span className="text-[10px] uppercase font-mono text-muted-foreground ml-1">JSON</span>
+                                        <Button size="sm" variant="ghost" className="h-4 w-4 p-0" title="Copy">
+                                          <Copy className="h-2.5 w-2.5" />
+                                        </Button>
+                                      </div>
+                                      <div className="border border-border/50 rounded-md overflow-hidden pt-6 bg-[#282c34] shadow-inner h-full">
+                                        <CodeMirror
+                                          value={JSON.stringify(example as Record<string, unknown>, null, 2)}
+                                          height="auto"
+                                          minHeight="100px"
+                                          extensions={[json()]}
+                                          theme={oneDark}
+                                          editable={false}
+                                          basicSetup={{
+                                            lineNumbers: false,
+                                            foldGutter: true,
+                                          }}
+                                          className="text-xs"
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </CardContent>
-                )}
-              </Card>
-            );
-          })}
+                          </div>
+                        );
+                      })}
+                    </CardContent>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
         </section>
       )}
     </main>

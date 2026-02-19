@@ -18,20 +18,13 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { useUser } from "@clerk/nextjs";
-import { Plus, Trash2, Copy, Edit, Rocket, BookText, Check, BarChart3, FolderOpen, Activity } from "lucide-react";
+import { Plus, Trash2, Copy, Edit, Rocket, BookText, Check, BarChart3, FolderOpen, Activity, TrendingUp, Zap, Clock } from "lucide-react";
 import { toast } from "react-hot-toast";
 import axios from "axios";
-
-type Project = {
-  id: string;
-  name: string;
-  slug?: string;
-  createdAt: string;
-  apiBaseUrl: string;
-  description?: string;
-  status?: "DRAFT" | "DEPLOYED" | "ARCHIVED";
-  deployedLink?: string;
-};
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { Area, AreaChart, Bar, BarChart, XAxis, YAxis, CartesianGrid } from "recharts";
+import { DeployModal, type Project } from "@/components/deploy-modal";
+import { motion } from "framer-motion";
 
 type Resource = {
   id: string;
@@ -48,6 +41,16 @@ type Resource = {
 type ProjectUsage = {
   currentUsage: number;
   maxLimit: number;
+};
+
+type AnalyticsData = {
+  totalRequests: number;
+  cacheHitRate: number;
+  rateLimitRemaining: number;
+  requestsToday: number;
+  requestsLimit: number;
+  hourlyRequests: Array<{ hour: string; requests: number }>;
+  cacheStats: Array<{ date: string; hitRate: number }>;
 };
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
@@ -67,19 +70,66 @@ export default function ProjectDetailPage() {
   const [isDeploying, setIsDeploying] = useState(false);
   const [usage, setUsage] = useState<ProjectUsage | null>(null);
   const [isLoadingUsage, setIsLoadingUsage] = useState(true);
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [timeUntilReset, setTimeUntilReset] = useState<string>("");
+
+  // Empty analytics data for fresh projects
+  const emptyAnalytics: AnalyticsData = {
+    totalRequests: 0,
+    cacheHitRate: 0,
+    rateLimitRemaining: 100, // Default starting limit
+    requestsToday: 0,
+    requestsLimit: 100,
+    hourlyRequests: Array.from({ length: 24 }, (_, i) => {
+      const hour = new Date();
+      hour.setHours(i, 0, 0, 0);
+      return {
+        hour: hour.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true }),
+        requests: 0,
+      };
+    }),
+    cacheStats: Array.from({ length: 7 }, (_, i) => {
+      const date = new Date();
+      date.setDate(date.getDate() - (6 - i));
+      return {
+        date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        hitRate: 0,
+      };
+    }),
+  };
+
+  // Calculate time until midnight (daily reset)
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = new Date();
+      const midnight = new Date(now);
+      midnight.setHours(24, 0, 0, 0);
+
+      const diff = midnight.getTime() - now.getTime();
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      setTimeUntilReset(`${hours}h ${minutes}m ${seconds}s`);
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
         setIsLoading(true);
-        
+
         // Get project first
         const projectRes = await axios.get<Project>(`${API_BASE_URL}/api/projects/${projectId}`);
         if (!cancelled) {
           setProject(projectRes.data ?? null);
         }
-        
+
         // Get resources
         const resourcesRes = await axios.get<Resource[]>(`${API_BASE_URL}/api/projects/${projectId}/resources`);
         if (!cancelled) {
@@ -97,16 +147,36 @@ export default function ProjectDetailPage() {
         } catch (usageError) {
           console.error("Failed to load usage data:", usageError);
           if (!cancelled) {
-            setUsage(null);
+            // Default to 0 usage if API fails (e.g. 404 for new project)
+            setUsage({ currentUsage: 0, maxLimit: 100 });
           }
         } finally {
           if (!cancelled) setIsLoadingUsage(false);
+        }
+
+        // Get analytics data
+        try {
+          const analyticsRes = await axios.get(`${API_BASE_URL}/api/projects/${projectId}/analytics`, {
+            headers: { "User-Id": user?.id || "" },
+          });
+          if (!cancelled) {
+            setAnalytics(analyticsRes.data);
+          }
+        } catch (analyticsError) {
+          // Suppress error log to avoid dev overlay for 404/429 on new projects
+          // console.error("Failed to load analytics data:", analyticsError);
+          if (!cancelled) {
+            // Use empty data if API fails (e.g. 404 for new project)
+            setAnalytics(emptyAnalytics);
+          }
         }
       } catch (e) {
         console.error("Failed to load project/resources from API:", e);
         if (!cancelled) {
           setProject(null);
           setResources([]);
+          // Set empty analytics even on error
+          setAnalytics(emptyAnalytics);
         }
       } finally {
         if (!cancelled) setIsLoading(false);
@@ -118,10 +188,25 @@ export default function ProjectDetailPage() {
     };
   }, [projectId, user?.id]);
 
+  const deployProject = async (projectToDeploy: Project) => {
+    setIsDeploying(true);
+    try {
+      await axios.put(`${API_BASE_URL}/api/projects/${projectToDeploy.id}/deploy`, {}, {
+        headers: { 'User-Id': user?.id || '' }
+      });
+      toast.success('Project deployed successfully!');
+      setProject((prev) => prev ? { ...prev, status: 'DEPLOYED' } : prev);
+      setShowDeployDialog(false);
+    } catch {
+      toast.error('Failed to deploy project.');
+    } finally {
+      setIsDeploying(false);
+    }
+  };
 
   if (isLoading) {
     return (
-      <main className="mx-auto max-w-6xl px-4 py-10 space-y-6">
+      <main className="mx-auto max-w-7xl px-4 py-10 space-y-6">
         <div className="space-y-2">
           <Skeleton className="h-9 w-64" />
           <Skeleton className="h-5 w-96" />
@@ -129,7 +214,7 @@ export default function ProjectDetailPage() {
         <Separator />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
-            <Card key={i}>
+            <Card key={i} className="bg-card/50 border-muted-foreground/10">
               <CardHeader>
                 <Skeleton className="h-6 w-32" />
                 <Skeleton className="h-4 w-24 mt-2" />
@@ -146,8 +231,8 @@ export default function ProjectDetailPage() {
 
   if (!project) {
     return (
-      <main className="mx-auto max-w-6xl px-4 py-10">
-        <Card className="max-w-md mx-auto">
+      <main className="mx-auto max-w-7xl px-4 py-10">
+        <Card className="max-w-md mx-auto bg-card/50 backdrop-blur-sm">
           <CardHeader>
             <CardTitle>Project not found</CardTitle>
             <CardDescription>
@@ -168,12 +253,18 @@ export default function ProjectDetailPage() {
   const totalEndpoints = resources.reduce((sum, r) => sum + (r.enabledMethods?.length || 0), 0);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-10 space-y-6">
+    <main className="mx-auto max-w-7xl px-4 py-10 space-y-6">
+      {/* Background Elements */}
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+        <div className="absolute left-0 right-0 top-0 -z-10 m-auto h-[310px] w-[310px] rounded-full bg-primary/20 opacity-20 blur-[100px]"></div>
+      </div>
+
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
-              <Link href="/dashboard">Dashboard</Link>
+              <Link href="/dashboard" className="hover:text-primary transition-colors">Dashboard</Link>
             </BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
@@ -185,18 +276,19 @@ export default function ProjectDetailPage() {
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">{project.name}</h1>
+          <h1 className="text-3xl font-semibold tracking-tight gradient-text">{project.name}</h1>
           <p className="text-muted-foreground">
             {project.description || "Manage endpoints for this project."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {project.slug && (
-            <Button 
-              asChild 
-              variant="outline" 
+            <Button
+              asChild
+              variant="outline"
               disabled={resources.length === 0}
               size="sm"
+              className="bg-background/50 backdrop-blur-sm"
             >
               <Link href={`/api/docs/${project.slug}`} target="_blank">
                 <BookText className="h-4 w-4 mr-2" />
@@ -214,7 +306,7 @@ export default function ProjectDetailPage() {
             <Button
               variant="default"
               onClick={() => setShowDeployDialog(true)}
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className="bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-900/20"
               size="sm"
             >
               <Rocket className="h-4 w-4 mr-2" />
@@ -224,109 +316,250 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Resources</CardTitle>
-            <FolderOpen className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalResources}</div>
-            <p className="text-xs text-muted-foreground">
-              Total resources
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Endpoints</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalEndpoints}</div>
-            <p className="text-xs text-muted-foreground">
-              Active endpoints
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Status</CardTitle>
-            <Rocket className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {project.status === 'DEPLOYED' ? 'Live' : 'Draft'}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {project.status || 'DRAFT'}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">API Usage</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoadingUsage ? (
-              <div className="space-y-2">
-                <Skeleton className="h-6 w-16" />
-                <Skeleton className="h-2 w-full" />
-              </div>
-            ) : usage ? (() => {
-              const usagePercent = (usage.currentUsage / usage.maxLimit) * 100;
-              const isHighUsage = usagePercent >= 80;
-              const isWarningUsage = usagePercent >= 60;
-              
-              return (
-                <div className="space-y-2">
-                  <div className="text-2xl font-bold">
-                    {usage.currentUsage.toLocaleString()}
-                    <span className="text-sm font-normal text-muted-foreground ml-1">
-                      / {usage.maxLimit.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="relative">
-                    <Progress 
-                      value={usagePercent} 
-                      className={`h-2 ${isHighUsage ? '[&>div]:bg-red-500' : isWarningUsage ? '[&>div]:bg-orange-500' : ''}`}
-                    />
-                  </div>
-                  <p className={`text-xs ${isHighUsage ? 'text-red-600 dark:text-red-400 font-medium' : isWarningUsage ? 'text-orange-600 dark:text-orange-400' : 'text-muted-foreground'}`}>
-                    {usagePercent.toFixed(1)}% of limit used
-                    {isHighUsage && ' - Near limit!'}
-                  </p>
+      {resources.length > 0 && (
+        <>
+          {/* Request Usage Card - Today's Usage with Countdown */}
+          <Card className="bg-card/50 backdrop-blur-sm border-muted-foreground/10 hover:shadow-md transition-all">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-lg font-semibold">Request Usage</CardTitle>
+              <Activity className="h-5 w-5 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {isLoadingUsage ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-8 w-48" />
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-4 w-32" />
                 </div>
-              );
-            })() : (
-              <div className="text-sm text-muted-foreground">
-                Usage data unavailable
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              ) : (() => {
+                const requestsToday = analytics?.requestsToday || usage?.currentUsage || 0;
+                const requestsLimit = analytics?.requestsLimit || usage?.maxLimit || 100;
+                const usagePercent = requestsLimit > 0 ? (requestsToday / requestsLimit) * 100 : 0;
+                const isHighUsage = usagePercent >= 80;
+                const isWarningUsage = usagePercent >= 60;
 
-      {resources.length === 0 && (
-        <div className="p-4 bg-muted/50 border border-dashed rounded-lg">
-          <p className="text-sm text-muted-foreground">
-            Deploy and Documentation will be enabled after you create at least one resource.
-          </p>
-        </div>
+
+
+                return (
+                  <div className="space-y-4">
+                    <div className="flex items-baseline gap-2">
+                      <div className="text-3xl font-bold">
+                        Used {requestsToday.toLocaleString()}
+                        <span className="text-lg font-normal text-muted-foreground ml-1">
+                          / {requestsLimit.toLocaleString()} requests today
+                        </span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Progress
+                        value={usagePercent}
+                        className={`h-3 ${isHighUsage ? '[&>div]:bg-red-500' : isWarningUsage ? '[&>div]:bg-orange-500' : '[&>div]:bg-blue-500'}`}
+                      />
+                      <div className="flex items-center justify-between text-sm">
+                        <span className={`${isHighUsage ? 'text-red-600 dark:text-red-400 font-medium' : isWarningUsage ? 'text-orange-600 dark:text-orange-400' : 'text-muted-foreground'}`}>
+                          {usagePercent.toFixed(1)}% of daily limit used
+                        </span>
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          <span>Resets in {timeUntilReset}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
+
+          {/* Analytics Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="bg-card/50 backdrop-blur-sm border-muted-foreground/10 hover:border-primary/20 transition-all">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Resources</CardTitle>
+                <FolderOpen className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{totalResources}</div>
+                <p className="text-xs text-muted-foreground">
+                  Total resources
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card/50 backdrop-blur-sm border-muted-foreground/10 hover:border-primary/20 transition-all">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Endpoints</CardTitle>
+                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{totalEndpoints}</div>
+                <p className="text-xs text-muted-foreground">
+                  Active endpoints
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card/50 backdrop-blur-sm border-muted-foreground/10 hover:border-primary/20 transition-all">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Status</CardTitle>
+                <Rocket className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {project.status === 'DEPLOYED' ? 'Live' : 'Draft'}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {project.status || 'DRAFT'}
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card/50 backdrop-blur-sm border-muted-foreground/10 hover:border-primary/20 transition-all">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Rate Limit Remaining</CardTitle>
+                <Zap className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                {analytics ? (
+                  <>
+                    <div className="text-2xl font-bold">{analytics.rateLimitRemaining}</div>
+                    <p className="text-xs text-muted-foreground">
+                      Requests remaining
+                    </p>
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    <Skeleton className="h-8 w-16" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Analytics Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Total Requests Card */}
+            <Card className="bg-card/50 backdrop-blur-sm border-muted-foreground/10">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" />
+                  Total Requests
+                </CardTitle>
+                <CardDescription>Requests over the last 24 hours</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {analytics ? (
+                  <div className="space-y-4">
+                    <div className="text-3xl font-bold">{analytics.totalRequests.toLocaleString()}</div>
+                    <ChartContainer
+                      config={{
+                        requests: {
+                          label: "Requests",
+                          color: "var(--chart-1)",
+                        },
+                      }}
+                      className="h-[200px]"
+                    >
+                      <AreaChart data={analytics.hourlyRequests}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis
+                          dataKey="hour"
+                          tickLine={false}
+                          axisLine={false}
+                          tickMargin={8}
+                          tickFormatter={(value) => value.split(' ')[0]}
+                        />
+                        <YAxis
+                          tickLine={false}
+                          axisLine={false}
+                          tickMargin={8}
+                        />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Area
+                          type="monotone"
+                          dataKey="requests"
+                          stroke="var(--chart-1)"
+                          fill="var(--chart-1)"
+                          fillOpacity={0.2}
+                        />
+                      </AreaChart>
+                    </ChartContainer>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Skeleton className="h-10 w-32" />
+                    <Skeleton className="h-[200px] w-full" />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Cache Hit % Card */}
+            <Card className="bg-card/50 backdrop-blur-sm border-muted-foreground/10">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Zap className="h-5 w-5" />
+                  Cache Hit Rate
+                </CardTitle>
+                <CardDescription>Cache performance over the last 7 days</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {analytics ? (
+                  <div className="space-y-4">
+                    <div className="text-3xl font-bold">{analytics.cacheHitRate.toFixed(1)}%</div>
+                    <ChartContainer
+                      config={{
+                        hitRate: {
+                          label: "Hit Rate",
+                          color: "var(--chart-2)",
+                        },
+                      }}
+                      className="h-[200px]"
+                    >
+                      <BarChart data={analytics.cacheStats}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis
+                          dataKey="date"
+                          tickLine={false}
+                          axisLine={false}
+                          tickMargin={8}
+                        />
+                        <YAxis
+                          tickLine={false}
+                          axisLine={false}
+                          tickMargin={8}
+                          domain={[0, 100]}
+                          tickFormatter={(value) => `${value}%`}
+                        />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Bar
+                          dataKey="hitRate"
+                          fill="var(--chart-2)"
+                          radius={[4, 4, 0, 0]}
+                        />
+                      </BarChart>
+                    </ChartContainer>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Skeleton className="h-10 w-24" />
+                    <Skeleton className="h-[200px] w-full" />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </>
       )}
 
       <Separator />
 
       {resources.length === 0 ? (
-        <Card className="border-dashed">
+        <Card className="border-dashed bg-muted/20 border-muted-foreground/20 max-w-lg">
           <CardHeader className="text-center py-12">
             <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
               <Plus className="h-6 w-6 text-muted-foreground" />
             </div>
             <CardTitle>No resources yet</CardTitle>
-            <CardDescription className="mt-2">
+            <CardDescription className="mt-2 text-base">
               Create your first resource to start building your API endpoints.
             </CardDescription>
             <Button asChild className="mt-6">
@@ -341,25 +574,25 @@ export default function ProjectDetailPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {resources.map((resource) => {
             const baseUrl = `${API_BASE_URL}/api/${project.slug || 'project-slug'}/${resource.slug}`;
-            const methodColors: {[key: string]: string} = {
+            const methodColors: { [key: string]: string } = {
               'GET': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
               'POST': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
               'PUT': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
               'DELETE': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
               'PATCH': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
             };
-            
+
             return (
-              <Card key={resource.id} className="hover:shadow-lg transition-all duration-200 group">
+              <Card key={resource.id} className="hover:shadow-lg transition-all duration-200 group bg-card/80 backdrop-blur-sm border-muted-foreground/10 hover:border-primary/50">
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <h3 className="text-lg font-semibold truncate">{resource.name}</h3>
                       <code className="text-xs font-mono text-muted-foreground">/{resource.slug}</code>
                     </div>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
+                    <Button
+                      size="sm"
+                      variant="ghost"
                       className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={() => {
                         navigator.clipboard.writeText(baseUrl);
@@ -385,22 +618,22 @@ export default function ProjectDetailPage() {
                     <div className="flex flex-wrap gap-2">
                       {resource.enabledMethods.map((method, index) => {
                         const displayMethod = method === 'GET_BY_ID' ? 'GET' : method;
-                        const route = method === 'GET_BY_ID' ? `/${resource.slug}/{id}` : 
-                                     method === 'GET' ? `/${resource.slug}` :
-                                     (method === 'PUT' || method === 'DELETE') ? `/${resource.slug}/{id}` : 
-                                     `/${resource.slug}`;
+                        const route = method === 'GET_BY_ID' ? `/${resource.slug}/{id}` :
+                          method === 'GET' ? `/${resource.slug}` :
+                            (method === 'PUT' || method === 'DELETE') ? `/${resource.slug}/{id}` :
+                              `/${resource.slug}`;
                         const fullUrl = `${API_BASE_URL}/api/${project.slug || 'project-slug'}${route}`;
-                        
+
                         return (
                           <div key={`${method}-${index}`} className="flex items-center gap-1">
                             <span className={`text-xs font-medium px-2 py-1 rounded ${methodColors[displayMethod] || 'bg-muted'}`}>
                               {displayMethod}
                             </span>
                             <code className="text-xs text-muted-foreground">{route}</code>
-                            <Button 
-                              size="sm" 
-                              variant="ghost" 
-                              className="h-6 w-6 p-0"
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-6 p-0 opacity-50 hover:opacity-100"
                               onClick={() => {
                                 navigator.clipboard.writeText(fullUrl);
                                 toast.success("Copied to clipboard");
@@ -415,14 +648,14 @@ export default function ProjectDetailPage() {
                         );
                       })}
                     </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" asChild>
+                    <div className="flex gap-2 pt-2">
+                      <Button size="sm" variant="outline" asChild className="hover:bg-primary/10 hover:text-primary transition-colors">
                         <Link href={`/dashboard/${project.id}/endpoints/${resource.id}`}>
                           <Edit className="h-3 w-3 mr-1" />
                           Edit
                         </Link>
                       </Button>
-                      <Button size="sm" variant="destructive" onClick={() => { setResourceToDelete(resource); setDeleteDialogOpen(true); }}>
+                      <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => { setResourceToDelete(resource); setDeleteDialogOpen(true); }}>
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
@@ -444,7 +677,7 @@ export default function ProjectDetailPage() {
           </DialogHeader>
           <div className="space-y-3 text-sm">
             {resourceToDelete && (
-              <div className="rounded-md border p-3">
+              <div className="rounded-md border p-3 bg-muted/50">
                 <div className="font-mono text-xs text-muted-foreground">/{resourceToDelete.slug}</div>
                 {resourceToDelete.description && (
                   <div className="mt-1 text-muted-foreground">{resourceToDelete.description}</div>
@@ -481,57 +714,15 @@ export default function ProjectDetailPage() {
           </div>
         </DialogContent>
       </Dialog>
-      {/* Deploy Dialog */}
-      {showDeployDialog && (
-        <Dialog open={showDeployDialog} onOpenChange={setShowDeployDialog}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Deploy Project</DialogTitle>
-              <DialogDescription>
-                Are you sure you want to deploy this project? It will become live and API endpoints will be accessible via the deployed URL.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-4 space-y-3">
-              <div>
-                <span className="font-medium">Name:</span> {project.name}
-              </div>
-              <div>
-                <span className="font-medium">Deploy URL:</span> <code>{API_BASE_URL}/api/{project.slug}</code>
-              </div>
-            </div>
-            <div className="flex gap-2 justify-end pt-2">
-              <Button variant="outline" onClick={() => setShowDeployDialog(false)} disabled={isDeploying}>Cancel</Button>
-              <Button
-                className="bg-green-600 hover:bg-green-700 text-white"
-                onClick={async () => {
-                  setIsDeploying(true);
-                  try {
-                    await axios.put(`${API_BASE_URL}/api/projects/${project.id}/deploy`, {}, {
-                      headers: { 'User-Id': user?.id || '' }
-                    });
-                    toast.success('Project deployed successfully!');
-                    setProject((prev) => prev ? { ...prev, status: 'DEPLOYED' } : prev);
-                    setShowDeployDialog(false);
-                  } catch {
-                    toast.error('Failed to deploy project.');
-                  } finally {
-                    setIsDeploying(false);
-                  }
-                }}
-                disabled={isDeploying}
-              >
-                {isDeploying ? (
-                  <><Rocket className="h-4 w-4 mr-2 animate-spin" /> Deploying...</>
-                ) : (
-                  <><Rocket className="h-4 w-4 mr-2" /> Deploy Project</>
-                )}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+
+      {/* Deploy Dialog - Using reusable component */}
+      <DeployModal
+        open={showDeployDialog}
+        onOpenChange={setShowDeployDialog}
+        project={project}
+        onDeploy={deployProject}
+        isDeploying={isDeploying}
+      />
     </main>
   );
 }
-
-

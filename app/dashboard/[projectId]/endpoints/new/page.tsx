@@ -1,6 +1,6 @@
 "use client";
 
-import {useState,useEffect} from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import axios from "axios";
@@ -74,14 +74,14 @@ export default function NewEndpointPage() {
   const [endpointName, setEndpointName] = useState("");
   const [endpointDescription, setEndpointDescription] = useState("");
   const [baseSlug, setBaseSlug] = useState("");
-  const [selectedMethods, setSelectedMethods] = useState<{[key: string]: boolean}>({
+  const [selectedMethods, setSelectedMethods] = useState<{ [key: string]: boolean }>({
     GET: false,
     POST: false,
     GET_BY_ID: false,
     PUT: false,
     DELETE: false,
   });
-  const [methodDescriptions, setMethodDescriptions] = useState<{[key: string]: string}>({
+  const [methodDescriptions, setMethodDescriptions] = useState<{ [key: string]: string }>({
     GET: "",
     POST: "",
     GET_BY_ID: "",
@@ -106,18 +106,18 @@ export default function NewEndpointPage() {
   // Detect dark mode
   useEffect(() => {
     const checkDarkMode = () => {
-      const isDark = document.documentElement.classList.contains('dark') || 
-                    window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const isDark = document.documentElement.classList.contains('dark') ||
+        window.matchMedia('(prefers-color-scheme: dark)').matches;
       setIsDarkMode(isDark);
     };
-    
+
     checkDarkMode();
     const observer = new MutationObserver(checkDarkMode);
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['class'],
     });
-    
+
     return () => observer.disconnect();
   }, []);
 
@@ -164,7 +164,7 @@ export default function NewEndpointPage() {
     if (endpointName) {
       const singular = endpointName.endsWith('s') ? endpointName.slice(0, -1) : endpointName;
       const plural = endpointName.endsWith('s') ? endpointName : endpointName + 's';
-      
+
       setMethodDescriptions({
         GET: `Get all ${plural}`,
         POST: `Add a new ${singular}`,
@@ -317,7 +317,7 @@ export default function NewEndpointPage() {
     if (!value.trim()) {
       return "JSON data is required";
     }
-    
+
     let parsedJson: unknown;
     try {
       parsedJson = JSON.parse(value);
@@ -332,11 +332,11 @@ export default function NewEndpointPage() {
     if (!Array.isArray(parsedJson)) {
       return "JSON must be an array of objects";
     }
-    
+
     if (parsedJson.length === 0) {
       return "Array must contain at least one object";
     }
-    
+
     if (typeof parsedJson[0] !== 'object' || parsedJson[0] === null) {
       return "Array must contain objects, not primitives";
     }
@@ -455,6 +455,12 @@ export default function NewEndpointPage() {
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-10 space-y-6">
+      {/* Background Elements */}
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+        <div className="absolute left-0 right-0 top-0 -z-10 m-auto h-[310px] w-[310px] rounded-full bg-primary/20 opacity-20 blur-[100px]"></div>
+      </div>
+
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -477,16 +483,55 @@ export default function NewEndpointPage() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight">
-          Create Resource
-        </h1>
-        <p className="text-muted-foreground">Project: {project.name}</p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sticky top-0 z-10 bg-background/80 backdrop-blur-md p-4 -mx-4 rounded-b-lg border-b border-border/40">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight gradient-text">
+            Create Resource
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Define your data model and endpoints for <span className="font-semibold text-foreground">{project.name}</span>
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            onClick={() => router.back()}
+            disabled={isSaving}
+            size="sm"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={saveResource}
+            disabled={
+              isSaving ||
+              !endpointName.trim() ||
+              !baseSlug.trim() ||
+              Object.values(selectedMethods).every(v => !v) ||
+              !!jsonError ||
+              !jsonSchema.trim()
+            }
+            size="sm"
+            className={isSaving ? "opacity-80" : "shadow-lg shadow-primary/20"}
+          >
+            {isSaving ? (
+              <>
+                <Sparkles className="h-3 w-3 mr-2 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Create Resource
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left panel - Resource Details */}
-        <Card>
+        <Card className="bg-card/50 backdrop-blur-sm border-muted-foreground/10 h-fit">
           <CardHeader>
             <CardTitle>Resource Details</CardTitle>
             <CardDescription>Configure your API resource</CardDescription>
@@ -496,13 +541,18 @@ export default function NewEndpointPage() {
               <Label htmlFor="endpointName">Resource Name</Label>
               <Input
                 id="endpointName"
-                placeholder="e.g. products"
+                placeholder="Product, Order, User..."
                 value={endpointName}
                 onChange={(e) => setEndpointName(e.target.value)}
+                className="bg-background/50 border-muted-foreground/20 focus:border-primary/50 transition-all font-medium"
               />
-              <p className="text-xs text-muted-foreground">
-                Base URL: <code className="bg-muted px-1 py-0.5 rounded">/{baseSlug}</code>
-              </p>
+              <div className="mt-2 p-2 bg-muted/50 rounded-md border border-border/50 flex items-center gap-2 text-xs text-muted-foreground font-mono overflow-x-auto">
+                <span className="shrink-0 flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-full bg-green-500/50"></div>
+                  Base URL:
+                </span>
+                <span className="text-foreground font-semibold">/{baseSlug || '...'}</span>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="endpointDescription">Description</Label>
@@ -510,167 +560,206 @@ export default function NewEndpointPage() {
                 id="endpointDescription"
                 placeholder="Describe what this endpoint group manages..."
                 value={endpointDescription}
-                className="!max-h-[400px]"
+                className="!max-h-[400px] bg-background/50 border-muted-foreground/20 focus:border-primary/50 transition-all resize-none"
                 onChange={(e) => setEndpointDescription(e.target.value)}
-                rows={3}
-
+                rows={4}
               />
             </div>
           </CardContent>
         </Card>
 
         {/* Middle panel - Method Selection */}
-        <Card>
+        <Card className="bg-card/50 backdrop-blur-sm border-muted-foreground/10 h-fit">
           <CardHeader>
             <CardTitle>Select Methods</CardTitle>
             <CardDescription>Choose which routes you need</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {methodConfigs.map((config) => (
-              <div key={config.key} className="space-y-2">
-                <div 
-                  className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                    selectedMethods[config.key] 
-                      ? 'border-primary bg-primary/5' 
-                      : 'border-border hover:border-primary/50'
-                  }`}
-                  onClick={() => 
-                    setSelectedMethods(prev => ({ ...prev, [config.key]: !prev[config.key] }))
-                  }
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono px-2 py-1 bg-muted rounded">{config.label}</span>
-                      <code className="text-xs text-muted-foreground">{config.route}</code>
+            {methodConfigs.map((config) => {
+              const isSelected = selectedMethods[config.key];
+              // Define colors per method
+              const colors: Record<string, string> = {
+                GET: "text-green-600 dark:text-green-400 bg-green-500/5 border-green-500/20 hover:border-green-500/50",
+                POST: "text-blue-600 dark:text-blue-400 bg-blue-500/5 border-blue-500/20 hover:border-blue-500/50",
+                GET_BY_ID: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 border-emerald-500/20 hover:border-emerald-500/50",
+                PUT: "text-orange-600 dark:text-orange-400 bg-orange-500/5 border-orange-500/20 hover:border-orange-500/50",
+                DELETE: "text-red-600 dark:text-red-400 bg-red-500/5 border-red-500/20 hover:border-red-500/50",
+              };
+              const activeColors: Record<string, string> = {
+                GET: "bg-green-500/10 border-green-500",
+                POST: "bg-blue-500/10 border-blue-500",
+                GET_BY_ID: "bg-emerald-500/10 border-emerald-500",
+                PUT: "bg-orange-500/10 border-orange-500",
+                DELETE: "bg-red-500/10 border-red-500",
+              };
+
+              const colorClass = colors[config.key] || "text-foreground bg-muted border-border";
+              const activeClass = activeColors[config.key] || "bg-primary/10 border-primary";
+
+              return (
+                <div key={config.key} className="space-y-2">
+                  <div
+                    className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 ${isSelected
+                      ? `${activeClass} shadow-sm`
+                      : `${colorClass} opacity-70 hover:opacity-100`
+                      }`}
+                    onClick={() =>
+                      setSelectedMethods(prev => ({ ...prev, [config.key]: !prev[config.key] }))
+                    }
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className={`text-[10px] font-bold font-mono px-2 py-1 rounded border bg-background/50 uppercase tracking-wider`}>
+                          {config.label}
+                        </span>
+                        <code className="text-xs font-medium opacity-80">{config.route}</code>
+                      </div>
+                      {isSelected ? (
+                        <div className="h-6 w-6 rounded-full bg-background/20 flex items-center justify-center">
+                          <Check className="h-3.5 w-3.5" />
+                        </div>
+                      ) : (
+                        <div className="h-6 w-6 rounded-full border border-foreground/10"></div>
+                      )}
                     </div>
-                    {selectedMethods[config.key] && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openMethodModal(config.key);
-                        }}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Settings className="h-4 w-4" />
-                      </Button>
+                    {isSelected && (
+                      <div className="mt-2 flex justify-end">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openMethodModal(config.key);
+                          }}
+                          className="h-6 px-2 text-[10px] hover:bg-background/20"
+                        >
+                          <Settings className="h-3 w-3 mr-1" />
+                          Configure
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
 
         {/* Right panel - Schema & Mock Data */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
+        <Card className="lg:col-span-1 bg-card/50 backdrop-blur-sm border-muted-foreground/10 flex flex-col h-full">
+          <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Data Schema</CardTitle>
-                <CardDescription>Paste your JSON data or generate sample data</CardDescription>
+                <CardDescription>Define your resource structure</CardDescription>
               </div>
-              <div className="flex gap-2">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={generateMockData}
+                className="h-8 bg-primary/10 hover:bg-primary/20 border-primary/20 text-primary"
+              >
+                <Sparkles className="h-3.5 w-3.5 mr-2" />
+                Auto-Generate
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="flex-1 flex flex-col gap-4">
+            <div className="flex items-center justify-between bg-muted/50 p-2 rounded-t-md border-x border-t border-border/50">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold pl-1">JSON Editor</span>
+                <span className="text-[10px] text-muted-foreground bg-background px-1.5 py-0.5 rounded border">
+                  ARRAY OF OBJECTS
+                </span>
+              </div>
+              <div className="flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={handleFormatJson}
+                  className="h-7 w-7 p-0 hover:bg-background/80"
                   title="Format JSON"
                 >
-                  <Settings className="h-4 w-4" />
+                  <Settings className="h-3.5 w-3.5" />
                 </Button>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={handleCopyJson}
+                  className="h-7 w-7 p-0 hover:bg-background/80"
                   title="Copy JSON"
                 >
                   {copied ? (
-                    <Check className="h-4 w-4 text-green-500" />
+                    <Check className="h-3.5 w-3.5 text-green-500" />
                   ) : (
-                    <Copy className="h-4 w-4" />
+                    <Copy className="h-3.5 w-3.5" />
                   )}
                 </Button>
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <Button variant="outline" size="sm" onClick={generateMockData} className="w-full">
-                <Sparkles className="h-4 w-4 mr-2" />
-                Generate Sample Data
-              </Button>
-              
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="json-data">JSON Data (array of objects)</Label>
-                  <span className="text-xs text-muted-foreground">
-                    {jsonSchema.split('\n').length} line{jsonSchema.split('\n').length !== 1 ? 's' : ''}
-                  </span>
-                </div>
-                <div className="border rounded-md overflow-hidden">
-                  <CodeMirror
-                    value={jsonSchema}
-                    height="500px"
-                    extensions={[json()]}
-                    theme={isDarkMode ? oneDark : undefined}
-                    onChange={handleJsonChange}
-                    basicSetup={{
-                      lineNumbers: true,
-                      foldGutter: true,
-                      dropCursor: false,
-                      allowMultipleSelections: false,
-                      indentOnInput: true,
-                      bracketMatching: true,
-                      closeBrackets: true,
-                      autocompletion: false,
-                      highlightSelectionMatches: true,
-                    }}
-                    placeholder="Paste your JSON data here or use the Generate Sample Data button..."
-                    className="text-sm"
-                  />
-                </div>
-                {jsonError && (
-                  <div className="p-4 bg-destructive/10 border-2 border-destructive/30 rounded-md">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 mt-0.5">
-                        <div className="w-5 h-5 rounded-full bg-destructive/20 flex items-center justify-center">
-                          <span className="text-destructive text-xs font-bold">!</span>
-                        </div>
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-destructive mb-1">JSON Validation Error</p>
-                        <p className="text-sm text-destructive/90">{jsonError}</p>
-                        <p className="text-xs text-destructive/70 mt-2">
-                          Please fix the error above before creating the resource.
-                        </p>
-                      </div>
+
+            <div className="border-x border-b border-border/50 rounded-b-md overflow-hidden -mt-4 bg-background/50 flex-1">
+              <CodeMirror
+                value={jsonSchema}
+                height="500px"
+                extensions={[json()]}
+                theme={isDarkMode ? oneDark : undefined}
+                onChange={handleJsonChange}
+                basicSetup={{
+                  lineNumbers: true,
+                  foldGutter: true,
+                  dropCursor: false,
+                  allowMultipleSelections: false,
+                  indentOnInput: true,
+                  bracketMatching: true,
+                  closeBrackets: true,
+                  autocompletion: false,
+                  highlightSelectionMatches: true,
+                }}
+                placeholder="Paste your JSON data here or use the Generate Sample Data button..."
+                className="text-sm"
+              />
+            </div>
+
+            {jsonError ? (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-md animate-in fade-in slide-in-from-top-1">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 mt-0.5">
+                    <div className="w-4 h-4 rounded-full bg-red-500/20 flex items-center justify-center">
+                      <span className="text-red-500 text-[10px] font-bold">!</span>
                     </div>
                   </div>
-                )}
-                {!jsonError && jsonSchema.trim() && (() => {
-                  try {
-                    const parsed = JSON.parse(jsonSchema);
-                    if (Array.isArray(parsed) && parsed.length > 0) {
-                      return (
-                        <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-md mt-2">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                            <p className="text-sm text-green-700 dark:text-green-400 font-medium">
-                              ✓ Valid JSON - {parsed.length} item{parsed.length !== 1 ? 's' : ''} ready
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    }
-                  } catch {
-                    // Ignore parse errors here, they're handled above
-                  }
-                  return null;
-                })()}
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-red-600 dark:text-red-400 mb-0.5">Validation Error</p>
+                    <p className="text-xs text-red-600/80 dark:text-red-400/80 break-all font-mono">{jsonError}</p>
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : jsonSchema.trim() && (
+              (() => {
+                try {
+                  const parsed = JSON.parse(jsonSchema);
+                  if (Array.isArray(parsed) && parsed.length > 0) {
+                    return (
+                      <div className="p-2 px-3 bg-green-500/10 border border-green-500/20 rounded-md flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
+                          <p className="text-xs text-green-700 dark:text-green-400 font-medium">
+                            Valid Schema
+                          </p>
+                        </div>
+                        <span className="text-[10px] bg-green-500/10 px-2 py-0.5 rounded-full text-green-700 dark:text-green-400 font-mono">
+                          {parsed.length} items
+                        </span>
+                      </div>
+                    );
+                  }
+                } catch {
+                  return null;
+                }
+                return null;
+              })()
+            )}
           </CardContent>
         </Card>
       </div>
@@ -680,18 +769,18 @@ export default function NewEndpointPage() {
         <Button
           onClick={saveResource}
           disabled={
-            isSaving || 
-            !endpointName.trim() || 
-            !baseSlug.trim() || 
+            isSaving ||
+            !endpointName.trim() ||
+            !baseSlug.trim() ||
             Object.values(selectedMethods).every(v => !v) ||
             !!jsonError ||
             !jsonSchema.trim()
           }
           size="lg"
           title={
-            jsonError 
-              ? `Cannot create resource: ${jsonError}` 
-              : !endpointName.trim() 
+            jsonError
+              ? `Cannot create resource: ${jsonError}`
+              : !endpointName.trim()
                 ? "Please enter a resource name"
                 : !baseSlug.trim()
                   ? "Please enter a slug"
@@ -706,7 +795,7 @@ export default function NewEndpointPage() {
             "Creating Resource..."
           ) : (
             <>
-              <Save className="h-4 w-4 mr-2" /> 
+              <Save className="h-4 w-4 mr-2" />
               Create Resource with {Object.values(selectedMethods).filter(Boolean).length} Method(s)
             </>
           )}
@@ -767,7 +856,7 @@ export default function NewEndpointPage() {
                   id="method-description"
                   placeholder={methodDescriptions[selectedMethodForModal]}
                   value={methodDescriptions[selectedMethodForModal]}
-                  onChange={(e) => 
+                  onChange={(e) =>
                     setMethodDescriptions(prev => ({ ...prev, [selectedMethodForModal]: e.target.value }))
                   }
                   rows={3}
@@ -788,8 +877,8 @@ export default function NewEndpointPage() {
               </div>
             </div>
           )}
-          </DialogContent>
-        </Dialog>
+        </DialogContent>
+      </Dialog>
 
       {/* Sample Data Generator Dialog */}
       <Dialog open={isGeneratorOpen} onOpenChange={setIsGeneratorOpen}>

@@ -22,7 +22,20 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import toast from "react-hot-toast";
-import { Plus, FolderOpen, Rocket, Calendar, Globe, Trash2, MoreVertical, Search, BarChart3 } from "lucide-react";
+import {
+  Plus,
+  FolderOpen,
+  Rocket,
+  Calendar,
+  Globe,
+  Trash2,
+  MoreVertical,
+  Search,
+  BarChart3,
+  Box,
+  Layers,
+  ArrowRight
+} from "lucide-react";
 import axios from "axios";
 import { useUser } from "@clerk/nextjs";
 import { Badge } from "@/components/ui/badge";
@@ -43,19 +56,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { motion } from "framer-motion";
+import { DeployModal, type Project } from "@/components/deploy-modal";
 
-type Project = {
-  id: string;
-  name: string;
-  description?: string;
-  slug?: string;
-  deployedLink?: string;
-  userId: string;
-  status: "DRAFT" | "DEPLOYED" | "ARCHIVED";
-  endpoints: unknown[]; // Define a proper Endpoint type if needed
-  createdAt: string;
-  updatedAt: string;
-};
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
 
@@ -120,7 +123,7 @@ export default function DashboardPage() {
   const filteredProjects = useMemo(() => {
     if (!searchQuery.trim()) return projects;
     const query = searchQuery.toLowerCase();
-    return projects.filter(p => 
+    return projects.filter(p =>
       p.name.toLowerCase().includes(query) ||
       p.description?.toLowerCase().includes(query) ||
       p.slug?.toLowerCase().includes(query)
@@ -190,7 +193,7 @@ export default function DashboardPage() {
       toast.success(`Project "${project.name}" deployed successfully!`);
       setDeployModalOpen(false);
       setSelectedProject(null);
-      
+
       // Refresh the projects list to get updated deployment status
       fetchProjects();
     } catch (error) {
@@ -215,7 +218,7 @@ export default function DashboardPage() {
       toast.success(`Project "${projectToDelete.name}" deleted successfully!`);
       setDeleteDialogOpen(false);
       setProjectToDelete(null);
-      
+
       // Refresh the projects list
       fetchProjects();
     } catch (error) {
@@ -228,408 +231,336 @@ export default function DashboardPage() {
 
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-10 space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">Manage your APIs and keys.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search projects..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 w-64"
-            />
-          </div>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Project
-              </Button>
-            </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create a new project</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="project-name">Project Name</Label>
-                <Input
-                  id="project-name"
-                  placeholder="e.g. E-commerce API"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="project-slug">Project Slug (unique)</Label>
-                <Input
-                  id="project-slug"
-                  placeholder="e.g. ecommerce-api"
-                  value={slug}
-                  onChange={(e) => {
-                    // Auto-format: lowercase, replace spaces with hyphens, remove special chars
-                    const formatted = e.target.value
-                      .toLowerCase()
-                      .replace(/\s+/g, "-")
-                      .replace(/[^a-z0-9-]/g, "");
-                    setSlug(formatted);
-                  }}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Only lowercase letters, numbers, and hyphens allowed
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="project-description">Description</Label>
-                <Textarea
-                  id="project-description"
-                  placeholder="Describe what this project will do..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                onClick={createProject}
-                disabled={!name.trim() || !slug.trim() || isCreating}
-              >
-                {isCreating ? (
-                  <>
-                    <Rocket className="h-4 w-4 mr-2 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  "Create Project"
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-        </div>
+    <>
+      <div className="fixed inset-0 -z-10 h-full w-full bg-background bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:14px_24px]">
+        <div className="absolute right-0 top-0 -z-10 m-auto h-[310px] w-[310px] rounded-full bg-primary/5 opacity-20 blur-[100px]"></div>
       </div>
 
-      {/* Stats Cards */}
-      {projects.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
-              <FolderOpen className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalProjects}</div>
-              <p className="text-xs text-muted-foreground">
-                {deployedProjects} deployed
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Deployed</CardTitle>
-              <Rocket className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{deployedProjects}</div>
-              <p className="text-xs text-muted-foreground">
-                {totalProjects > 0 ? Math.round((deployedProjects / totalProjects) * 100) : 0}% of projects
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Endpoints</CardTitle>
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalEndpoints}</div>
-              <p className="text-xs text-muted-foreground">
-                Across all projects
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Search Results Info */}
-      {searchQuery && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Search className="h-4 w-4" />
-          <span>
-            {filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''} found
-            {filteredProjects.length !== projects.length && ` (filtered from ${projects.length})`}
-          </span>
-        </div>
-      )}
-
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {loading ? (
-          <>
-            {[1, 2, 3].map((i) => (
-              <Card key={i}>
-                <CardHeader>
-                  <Skeleton className="h-6 w-32" />
-                  <Skeleton className="h-4 w-48 mt-2" />
-                </CardHeader>
-                <CardContent>
-                  <Skeleton className="h-10 w-full" />
-                </CardContent>
-              </Card>
-            ))}
-          </>
-        ) : filteredProjects.length === 0 ? (
-          <Card className="col-span-full border-dashed">
-            <CardHeader className="text-center py-12">
-              <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
-                {searchQuery ? (
-                  <Search className="h-6 w-6 text-muted-foreground" />
-                ) : (
-                  <FolderOpen className="h-6 w-6 text-muted-foreground" />
-                )}
-              </div>
-              <CardTitle>
-                {searchQuery ? "No projects found" : "No projects yet"}
-              </CardTitle>
-              <CardDescription className="mt-2">
-                {searchQuery 
-                  ? `No projects match "${searchQuery}". Try a different search term.`
-                  : "Get started by creating your first API project. It only takes a few minutes!"
-                }
-              </CardDescription>
-              {!searchQuery && (
-                <Button className="mt-6" onClick={() => setOpen(true)}>
+      <main className="mx-auto max-w-7xl px-6 py-10 space-y-10">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-4xl font-bold tracking-tight">Dashboard</h1>
+            <p className="text-muted-foreground mt-2 text-lg">Manage your APIs and keys from one place.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="relative group">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+              <Input
+                placeholder="Search projects... (Cmd+K)"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 w-64 bg-background/50 backdrop-blur-sm border-muted-foreground/20 focus-visible:ring-primary/20 transition-all"
+              />
+            </div>
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button className="shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all">
                   <Plus className="h-4 w-4 mr-2" />
-                  Create your first project
+                  New Project
                 </Button>
-              )}
-            </CardHeader>
-          </Card>
-        ) : (
-          filteredProjects.map((p) => (
-            <Card key={p.id} className="hover:shadow-md transition-shadow">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-lg">{p.name}</CardTitle>
-                    <CardDescription className="mt-1 line-clamp-2">
-                      {p.description || "No description"}
-                    </CardDescription>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                  <DialogTitle>Create a new project</DialogTitle>
+                  <CardDescription>
+                    Start building a new API collection.
+                  </CardDescription>
+                </DialogHeader>
+                <div className="space-y-4 pt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="project-name">Project Name</Label>
+                    <Input
+                      id="project-name"
+                      placeholder="e.g. E-commerce API"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                    />
                   </div>
-                  {p.status && (
-                    <Badge 
-                      variant={p.status === 'DEPLOYED' ? 'default' : 'secondary'}
-                      className="ml-2 shrink-0"
-                    >
-                      {p.status}
-                    </Badge>
-                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="project-slug">Project Slug (unique)</Label>
+                    <Input
+                      id="project-slug"
+                      placeholder="e.g. ecommerce-api"
+                      value={slug}
+                      onChange={(e) => {
+                        // Auto-format: lowercase, replace spaces with hyphens, remove special chars
+                        const formatted = e.target.value
+                          .toLowerCase()
+                          .replace(/\s+/g, "-")
+                          .replace(/[^a-z0-9-]/g, "");
+                        setSlug(formatted);
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Only lowercase letters, numbers, and hyphens allowed
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="project-description">Description</Label>
+                    <Textarea
+                      id="project-description"
+                      placeholder="Describe what this project will do..."
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      rows={3}
+                    />
+                  </div>
                 </div>
-                {p.slug && (
-                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                    <Globe className="h-3 w-3" />
-                    <code className="font-mono">{p.slug}</code>
-                  </div>
-                )}
-                {p.createdAt && (
-                  <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                    <Calendar className="h-3 w-3" />
-                    <span>Created {new Date(p.createdAt).toLocaleDateString()}</span>
-                  </div>
-                )}
+                <DialogFooter className="mt-4">
+                  <Button
+                    onClick={createProject}
+                    disabled={!name.trim() || !slug.trim() || isCreating}
+                    className="w-full sm:w-auto"
+                  >
+                    {isCreating ? (
+                      <>
+                        <Rocket className="h-4 w-4 mr-2 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      "Create Project"
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        {projects.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <Card className="bg-card/50 backdrop-blur-sm border-muted-foreground/10 shadow-sm hover:shadow-md transition-all">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total Projects</CardTitle>
+                <div className="p-2 bg-blue-500/10 rounded-lg">
+                  <Box className="h-4 w-4 text-blue-500" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="flex gap-2">
-                  <Button asChild size="sm" className="flex-1">
-                    <Link href={`/dashboard/${p.id}`}>
-                      <FolderOpen className="h-4 w-4 mr-2" />
-                      Open Project
-                    </Link>
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        <MoreVertical className="h-4 w-4" />
-                        <span className="sr-only">More options</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onClick={() => {
-                          setProjectToDelete(p);
-                          setDeleteDialogOpen(true);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete Project
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                <div className="text-3xl font-bold">{totalProjects}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Active workspaces
+                </p>
               </CardContent>
             </Card>
-          ))
-        )}
-      </section>
-
-      {/* Deploy Modal */}
-      <Dialog open={deployModalOpen} onOpenChange={setDeployModalOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>
-              {selectedProject?.status === 'DEPLOYED' ? 'Deployment Information' : 'Deploy Project'}
-            </DialogTitle>
-          </DialogHeader>
-          {selectedProject && (
-            <div className="space-y-4">
-              {selectedProject.status === 'DEPLOYED' && (
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-sm font-medium text-green-800">
-                      Project is currently deployed and live
-                    </span>
-                  </div>
+            <Card className="bg-card/50 backdrop-blur-sm border-muted-foreground/10 shadow-sm hover:shadow-md transition-all">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Deployed APIs</CardTitle>
+                <div className="p-2 bg-green-500/10 rounded-lg">
+                  <Rocket className="h-4 w-4 text-green-500" />
                 </div>
-              )}
-              <div className="space-y-2">
-                <Label>Project Information</Label>
-                <div className="p-4 bg-muted rounded-lg space-y-2">
-                  <div>
-                    <span className="font-medium">Name: </span>
-                    <span>{selectedProject.name}</span>
-                  </div>
-                  <div>
-                    <span className="font-medium">Description: </span>
-                    <span>{selectedProject.description || "No description"}</span>
-                  </div>
-                  <div>
-                    <span className="font-medium">Status: </span>
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      selectedProject.status === 'DEPLOYED' 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {selectedProject.status}
-                    </span>
-                    {selectedProject.status === 'DEPLOYED' && (
-                      <span className="ml-2 text-xs text-green-600">
-                        ✓ Live and accessible
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="deployed-url">
-                  {selectedProject.status === 'DEPLOYED' ? 'Current Deployed URL' : 'Deployed URL'}
-                </Label>
-                <Input
-                  id="deployed-url"
-                  value={selectedProject.deployedLink || `${API_BASE_URL}/api/${selectedProject.slug || 'project-slug'}`}
-                  readOnly
-                  className="bg-muted"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {selectedProject.status === 'DEPLOYED' 
-                    ? 'This URL is currently live and accessible'
-                    : 'This URL will be available after deployment'
-                  }
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold">{deployedProjects}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {totalProjects > 0 ? Math.round((deployedProjects / totalProjects) * 100) : 0}% deployment rate
                 </p>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            {selectedProject?.status === 'DEPLOYED' ? (
-              <>
-                {selectedProject?.slug && (
-                  <Button asChild variant="secondary">
-                    <Link href={`/docs/${selectedProject.slug}`}>View Docs</Link>
+              </CardContent>
+            </Card>
+            <Card className="bg-card/50 backdrop-blur-sm border-muted-foreground/10 shadow-sm hover:shadow-md transition-all">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total Endpoints</CardTitle>
+                <div className="p-2 bg-purple-500/10 rounded-lg">
+                  <Layers className="h-4 w-4 text-purple-500" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold">{totalEndpoints}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Across all projects
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Search Results Info */}
+        {searchQuery && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground animate-in fade-in slide-in-from-left-2">
+            <Search className="h-4 w-4" />
+            <span>
+              {filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''} found
+              {filteredProjects.length !== projects.length && ` (filtered from ${projects.length})`}
+            </span>
+          </div>
+        )}
+
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {loading ? (
+            <>
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="bg-card/50 border-muted-foreground/10">
+                  <CardHeader>
+                    <Skeleton className="h-6 w-32" />
+                    <Skeleton className="h-4 w-48 mt-2" />
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-10 w-full" />
+                  </CardContent>
+                </Card>
+              ))}
+            </>
+          ) : filteredProjects.length === 0 ? (
+            <Card className="col-span-full border-dashed bg-muted/20 border-muted-foreground/20">
+              <CardHeader className="text-center py-16">
+                <div className="mx-auto w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                  {searchQuery ? (
+                    <Search className="h-8 w-8 text-muted-foreground" />
+                  ) : (
+                    <FolderOpen className="h-8 w-8 text-muted-foreground" />
+                  )}
+                </div>
+                <CardTitle className="text-xl">
+                  {searchQuery ? "No projects found" : "No projects yet"}
+                </CardTitle>
+                <CardDescription className="mt-2 max-w-md mx-auto text-base">
+                  {searchQuery
+                    ? `No projects match "${searchQuery}". Try a different search term.`
+                    : "Get started by creating your first API project. It only takes a few minutes!"
+                  }
+                </CardDescription>
+                {!searchQuery && (
+                  <Button className="mt-8 w-fit mx-auto" onClick={() => setOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create your first project
                   </Button>
                 )}
-                <Button onClick={() => setDeployModalOpen(false)}>Close</Button>
-              </>
-            ) : (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => setDeployModalOpen(false)}
-                  disabled={isDeploying}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={() => selectedProject && deployProject(selectedProject)}
-                  disabled={isDeploying}
-                >
-                  {isDeploying ? (
-                    <>
-                      <Rocket className="h-4 w-4 mr-2 animate-spin" />
-                      Deploying...
-                    </>
-                  ) : (
-                    <>
-                      <Rocket className="h-4 w-4 mr-2" />
-                      Deploy Project
-                    </>
-                  )}
-                </Button>
-              </>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              </CardHeader>
+            </Card>
+          ) : (
+            filteredProjects.map((p) => (
+              <motion.div
+                key={p.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <Card className="group hover:shadow-lg hover:border-primary/50 transition-all duration-300 bg-card/80 backdrop-blur-sm border-muted-foreground/10">
+                  <CardHeader className="space-y-1">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 space-y-1">
+                        <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                          {p.name}
+                        </CardTitle>
+                        <CardDescription className="line-clamp-2 text-sm">
+                          {p.description || "No description provided."}
+                        </CardDescription>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 text-muted-foreground hover:text-foreground">
+                            <MoreVertical className="h-4 w-4" />
+                            <span className="sr-only">More options</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive cursor-pointer"
+                            onClick={() => {
+                              setProjectToDelete(p);
+                              setDeleteDialogOpen(true);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete Project
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
 
-      {/* Delete Project Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Project</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the project
-              {projectToDelete ? ` "${projectToDelete.name}"` : ""} and all its resources, endpoints, and data.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {projectToDelete && (
-            <div className="rounded-md border p-3 bg-muted">
-              <div className="font-medium">{projectToDelete.name}</div>
-              {projectToDelete.description && (
-                <div className="mt-1 text-sm text-muted-foreground">{projectToDelete.description}</div>
-              )}
-              {projectToDelete.slug && (
-                <div className="mt-1 font-mono text-xs text-muted-foreground">{projectToDelete.slug}</div>
-              )}
-            </div>
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      {p.status && (
+                        <Badge
+                          variant="outline"
+                          className={`${p.status === 'DEPLOYED'
+                            ? 'bg-green-500/10 text-green-600 border-green-500/20'
+                            : 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20'
+                            }`}
+                        >
+                          {p.status === 'DEPLOYED' && <div className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 animate-pulse" />}
+                          {p.status}
+                        </Badge>
+                      )}
+                      {p.slug && (
+                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-muted/50 text-xs text-muted-foreground border border-muted-foreground/10">
+                          <Globe className="h-3 w-3" />
+                          <code className="font-mono">{p.slug}</code>
+                        </div>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <Button asChild className="w-full group-hover:bg-primary/90 transition-colors">
+                      <Link href={`/dashboard/${p.id}`}>
+                        Open Project
+                        <ArrowRight className="h-4 w-4 ml-2 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))
           )}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={deleteProject}
-              disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isDeleting ? (
-                <>
-                  <Trash2 className="h-4 w-4 mr-2 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Project
-                </>
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </main>
+        </section>
+
+        {/* Deploy Modal */}
+        <DeployModal
+          open={deployModalOpen}
+          onOpenChange={setDeployModalOpen}
+          project={selectedProject}
+          onDeploy={(project) => deployProject(project)}
+          isDeploying={isDeploying}
+        />
+
+        {/* Delete Project Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Project</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the project
+                {projectToDelete ? <span className="font-semibold text-foreground"> "{projectToDelete.name}"</span> : ""} and all its resources, endpoints, and data.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {projectToDelete && (
+              <div className="rounded-lg border p-4 bg-muted/50 border-destructive/20">
+                <div className="font-medium text-foreground">{projectToDelete.name}</div>
+                {projectToDelete.description && (
+                  <div className="mt-1 text-sm text-muted-foreground">{projectToDelete.description}</div>
+                )}
+                {projectToDelete.slug && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <Badge variant="outline" className="font-mono text-xs">
+                      {projectToDelete.slug}
+                    </Badge>
+                  </div>
+                )}
+              </div>
+            )}
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={deleteProject}
+                disabled={isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Project
+                  </>
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </main>
+    </>
   );
 }
